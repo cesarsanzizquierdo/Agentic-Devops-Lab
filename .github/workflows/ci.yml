@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  tamano-pr:
+    name: Gate de tamano de PR
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout del codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verificar limite de lineas de diff
+        env:
+          LIMITE_LINEAS: 400
+        run: |
+          
+          DIFF_LINES=$(git diff --numstat origin/main...HEAD | awk '{sum += $1 + $2} END {print sum}')
+          DIFF_LINES=${DIFF_LINES:-0}
+          echo "Lineas de diff en este PR: $DIFF_LINES (Limite maximo: $LIMITE_LINEAS)"
+          if [ "$DIFF_LINES" -gt "$LIMITE_LINEAS" ]; then
+            echo "ERROR: El PR excede el limite de $LIMITE_LINEAS lineas de diff."
+            exit 1
+          fi
+
+  conventional-commits:
+    name: Validar Conventional Commits
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout del codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validar formato del commit
+        run: |
+          TITLE=$(git log -1 --pretty=%B)
+          echo "Mensaje del commit: $TITLE"
+          echo "$TITLE" | grep -Eq '^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9_-]+\))?: .+' || {
+            echo "ERROR: El mensaje del commit no cumple con Conventional Commits (ej. feat: ..., ci: ...)"
+            exit 1
+          }
+
+  tests:
+    name: Pruebas unitarias
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ejecutar pytest
+        run: |
+          # tests/ no tiene tests aun en la semilla (pytest sale con codigo 5)
+          pytest tests/ || [ $? -eq 5 ]
