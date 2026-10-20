@@ -34,13 +34,18 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - name: Validar formato del commit o PR
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
+      - name: Checkout del codigo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Validar mensaje del commit
         run: |
-          echo "Titulo a validar: $PR_TITLE"
-          echo "$PR_TITLE" | grep -Eq '^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9_-]+\))?: .+' || {
-            echo "ERROR: El titulo del PR no cumple con Conventional Commits (ej. feat: ..., ci: ...)"
+          MSG=$(git log -1 --pretty=%B)
+          echo "Mensaje del commit a validar: $MSG"
+          echo "$MSG" | grep -Eq '^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9_-]+\))?: .+' || {
+            echo "ERROR: El commit no cumple con Conventional Commits (ej. feat: ..., ci: ...)"
             exit 1
           }
 
