@@ -1,5 +1,4 @@
 ## Checklist de revision
-
 - [ ] 1. ¿Cada criterio de aceptacion tocado tiene test que lo referencia?
 - [ ] 2. ¿Los tests fallan si rompo la implementacion a proposito?
 - [ ] 3. ¿Hay algun test omitido, marcado o con asercion vacia?

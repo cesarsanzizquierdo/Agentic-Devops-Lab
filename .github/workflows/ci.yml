@@ -21,7 +21,6 @@ jobs:
         env:
           LIMITE_LINEAS: 400
         run: |
-          
           DIFF_LINES=$(git diff --numstat origin/main...HEAD | awk '{sum += $1 + $2} END {print sum}')
           DIFF_LINES=${DIFF_LINES:-0}
           echo "Lineas de diff en este PR: $DIFF_LINES (Limite maximo: $LIMITE_LINEAS)"
@@ -35,17 +34,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - name: Checkout del codigo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Validar formato del commit
+      - name: Validar formato del commit o PR
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          TITLE=$(git log -1 --pretty=%B)
-          echo "Mensaje del commit: $TITLE"
-          echo "$TITLE" | grep -Eq '^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9_-]+\))?: .+' || {
-            echo "ERROR: El mensaje del commit no cumple con Conventional Commits (ej. feat: ..., ci: ...)"
+          echo "Titulo a validar: $PR_TITLE"
+          echo "$PR_TITLE" | grep -Eq '^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9_-]+\))?: .+' || {
+            echo "ERROR: El titulo del PR no cumple con Conventional Commits (ej. feat: ..., ci: ...)"
             exit 1
           }
 
@@ -69,5 +64,4 @@ jobs:
 
       - name: Ejecutar pytest
         run: |
-          # tests/ no tiene tests aun en la semilla (pytest sale con codigo 5)
           pytest tests/ || [ $? -eq 5 ]
