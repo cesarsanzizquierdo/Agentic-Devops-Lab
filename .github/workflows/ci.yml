@@ -50,7 +50,7 @@ jobs:
           }
 
   tests:
-    name: Pruebas unitarias
+    name: Pruebas unitarias y cobertura
     runs-on: ubuntu-latest
     steps:
       - name: Checkout del codigo
@@ -65,8 +65,42 @@ jobs:
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pytest-cov fastapi uvicorn httpx
 
-      - name: Ejecutar pytest
+      - name: Ejecutar pytest con cobertura
+        env:
+          PYTHONPATH: src
         run: |
-          pytest tests/ || [ $? -eq 5 ]
+          pytest tests/ -v --cov=src/aula --cov-report=term-missing
+
+  imagen-oci:
+    name: Build y publicacion de imagen OCI
+    runs-on: ubuntu-latest
+    needs: tests
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout del codigo
+        uses: actions/checkout@v4
+
+      - name: Construir imagen OCI multi-stage
+        run: |
+          IMAGE_NAME="ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')"
+          docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:${{ github.sha }} .
+
+      - name: Login en GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publicar imagen en GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          IMAGE_NAME="ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')"
+          docker push $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:${{ github.sha }}
