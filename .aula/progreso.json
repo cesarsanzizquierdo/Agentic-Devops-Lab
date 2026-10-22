@@ -1,0 +1,17 @@
+{
+  "student": "sin-asignar",
+  "estaciones": {
+    "S0": {
+      "estado": "sellada",
+      "pistas": 0,
+      "intentos": 1,
+      "predicciones": {
+        "aciertos": 0,
+        "total": 0
+      },
+      "desbloqueada": false,
+      "sellada": "2026-10-21T07:27:33+00:00"
+    }
+  },
+  "creado": "2026-10-21T07:23:06+00:00"
+}
