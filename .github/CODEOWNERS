@@ -1,0 +1,4 @@
+# Rutas protegidas que requieren aprobacion explicita
+labs/           @cesarsanzizquierdo
+manifiestos/    @cesarsanzizquierdo
+.github/        @cesarsanzizquierdo
