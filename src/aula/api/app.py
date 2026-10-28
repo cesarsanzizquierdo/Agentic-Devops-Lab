@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from ..dominio.modelos import SolicitudMatricula, Expediente, RegistroAcademico, EstadoRegistro
 from ..reglas.motor import evaluar_solicitud, VentanaMatricula, VentanaCerrada
 from ..reglas.planes import cargar_plan
+from decimal import Decimal
+from ..reglas.media import resumen_expediente
 
 app = FastAPI(title="Aula Students", version="0.0.0")
 
@@ -29,13 +31,19 @@ try:
     
     for datos_alumno in datos_estudiantes:
         registros_historial = []
+
         for reg in datos_alumno["registros"]:
+            if reg["nota"] is not None:
+                nota_decimal = Decimal(str(reg["nota"]))
+            else:
+                nota_decimal = None
+
             nuevo_registro = RegistroAcademico(
                 codigo_asignatura=reg["codigo_asignatura"],
                 curso_academico=reg["curso_academico"],
                 convocatoria=reg["convocatoria"],
                 estado=EstadoRegistro(reg["estado"]),
-                nota=reg["nota"]
+                nota=nota_decimal
             )
             registros_historial.append(nuevo_registro)
             
@@ -90,4 +98,19 @@ def crear_matricula(entrada: SolicitudEntrada):
 
 @app.get("/expedientes/{estudiante_id}")
 def ver_expediente(estudiante_id: str):
-    raise HTTPException(status_code=501, detail="S2: consulta de expediente pendiente")
+    if estudiante_id not in BD_EXPEDIENTES:
+        raise HTTPException(status_code=404, detail="Estudiante no encontrado")
+
+    expediente_alumno = BD_EXPEDIENTES[estudiante_id]
+    datos_resumen = resumen_expediente(expediente_alumno, PLAN_ACTUAL)
+
+    respuesta = {
+        "estudiante_id": datos_resumen["estudiante_id"],
+        "plan": datos_resumen["plan"],
+        "nota_media": float(datos_resumen["nota_media"]),
+        "creditos_superados": datos_resumen["creditos_superados"],
+        "progreso": float(datos_resumen["progreso"]),
+        "progreso_pct": float(datos_resumen["progreso_pct"]),
+        "convocatorias": datos_resumen["convocatorias"],
+    }
+    return respuesta
