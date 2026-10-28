@@ -47,6 +47,8 @@ La decisión debe quedar auditada con la versión de plan aplicada.
 | Créditos pendientes iguales al umbral de fin de carrera | Se aplica la excepción de CA-03 |
 | Asignatura con grupo completo y además prerrequisito pendiente | Prevalece el rechazo por prerrequisito, no la lista de espera |
 | Plan sin grupos declarados | Ninguna línea va a lista de espera |
+| Código solicitado que no pertenece al plan | Esa línea se rechaza por asignatura fuera de plan; el resto se evalúa con normalidad. Ver A-03 |
+| Momento con zona horaria y ventana sin ella, o al revés | Los instantes sin zona se interpretan como UTC antes de comparar. Ver A-04 |
 
 ## Fuera de alcance
 
@@ -64,3 +66,5 @@ Rutas: src/aula/reglas/motor.py, src/aula/dominio/, tests/test_reglas_matricula.
 |---|-----------|------------|-------|
 | A-01 | El enunciado original decía "se rechazan las asignaturas que superen el límite" sin fijar orden. Con orden indeterminado el resultado no es reproducible | Se admiten en el orden en que aparecen en la solicitud. Recogido en CA-03 | 2026-08 |
 | A-02 | No estaba definido si una convalidación consume convocatoria | No la consume. Recogido en CA-04 | 2026-08 |
+| A-03 | No estaba definido qué ocurre si se solicita un código que no pertenece al plan. La implementación lanzaba una excepción sin escribir auditoría (INV-01) y perdía las líneas válidas de la misma solicitud (INV-02) | Se rechaza solo esa línea por asignatura fuera de plan, como CA-02 hace con los prerrequisitos. Rechazar la solicitud entera castigaría las asignaturas válidas | 2026-10 |
+| A-04 | La entrada declara momentos ISO-8601 sin fijar zona horaria. Comparar un instante con zona (el que genera la API por defecto) con una ventana sin ella fallaba sin auditoría | Los instantes sin zona se interpretan como UTC. Europe/Madrid se descartó porque exige la dependencia `tzdata` en Windows | 2026-10 |

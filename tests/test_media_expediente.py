@@ -106,6 +106,26 @@ def test_spec002_ca04_inv01_redondeo_unico_final_y_half_up():
     assert nota_media_ponderada(expediente, plan) == Decimal("7.01")
 
 
+def test_spec002_ca04_inv01_redondeo_por_asignatura_altera_la_media():
+    """cubre: SPEC-002/CA-04, SPEC-002/INV-01. (7*6 + 7.006*9)/15 = 7.0036 -> 7.00; redondeando antes cada nota saldria 7.01."""
+    plan = obtener_plan_pruebas()
+    registros = [
+        crear_registro("MAT101", 1, "aprobada", "7.000"),
+        crear_registro("PRG101", 1, "aprobada", "7.006"),
+    ]
+    expediente = Expediente("EST-05B", plan.codigo, registros)
+
+    assert nota_media_ponderada(expediente, plan) == Decimal("7.00")
+
+
+def test_spec002_ca04_punto_medio_half_up():
+    """cubre: SPEC-002/CA-04. Media exactamente en 7,005 redondea half-up a 7,01 (half-even daria 7,00)."""
+    plan = obtener_plan_pruebas()
+    expediente = Expediente("EST-05C", plan.codigo, [crear_registro("MAT101", 1, "aprobada", "7.005")])
+
+    assert nota_media_ponderada(expediente, plan) == Decimal("7.01")
+
+
 def test_spec002_ca06_calculo_progreso():
     """cubre: SPEC-002/CA-06. Porcentaje de creditos superados sobre el total del titulo."""
     plan = obtener_plan_pruebas()
