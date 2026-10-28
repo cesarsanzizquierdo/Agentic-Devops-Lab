@@ -43,6 +43,11 @@ python3 -m agentes.conformidad.evaluar         # métricas del agente de conform
 No digas que algo funciona. Enseña la salida en verde. Una afirmación no es
 evidencia.
 
+`aula_cli check` lo ejecuta el humano: cada ejecución suma un intento a la
+estación activa en `.aula/progreso.json`, que es el registro del alumno. Los
+agentes usan `python labs/<estación>/verificar.py`, que comprueba lo mismo sin
+escribir nada.
+
 ## Convenciones
 
 - Conventional commits: `feat:`, `fix:`, `test:`, `refactor:`, `docs:`, `chore:`.
@@ -66,6 +71,10 @@ Rutas que **no puedes modificar** sin aprobación humana explícita:
 | `labs/*/verificar.py` | Es la vara de medir del laboratorio |
 | `evals/dorado*/` | Es el conjunto de evaluación. Optimizar contra él en lugar de contra el problema es el fallo clásico |
 
+`.claude/` (permisos, hooks y subagentes) y este CLAUDE.md sí se pueden
+modificar, pero siempre con confirmación del humano: la regla `ask` de
+`.claude/settings.json` lo pregunta antes de cada cambio.
+
 ## Escalado
 
 Ante una ambigüedad de la especificación: **pregunta, no asumas**. Una
@@ -81,10 +90,12 @@ spec correspondiente antes de implementar nada.
 Quien escribe el código no es quien lo revisa. Hay dos subagentes en
 `.claude/agents/`:
 
-| Subagente | Cuándo usarlo | Qué puede hacer |
-|-----------|---------------|-----------------|
-| `implementador` | El encargo está decidido y la spec no tiene ambigüedades abiertas | Leer, editar, escribir y ejecutar tests |
-| `revisor` | Antes de abrir un PR | Solo leer. Revisa únicamente el diff que se le entrega, con la checklist del PR |
+| Subagente | Cuándo usarlo | Qué puede hacer | Modelo |
+|-----------|---------------|-----------------|--------|
+| `implementador` | El encargo está decidido y la spec no tiene ambigüedades abiertas | Leer, editar, escribir y ejecutar tests | Sonnet |
+| `revisor` | Antes de abrir un PR | Solo leer. Revisa únicamente el diff que se le entrega, con la checklist del PR | Opus |
+
+El modelo va fijado en la cabecera de cada subagente para que no dependa del modelo de la sesión. Revisor con Opus porque un fallo que se escapa cuesta más que el coste de revisar 400 líneas.
 
 El revisor solo puede leer, a propósito. Si no puede editar, no puede arreglar
 lo que critica: quien revisa no es quien escribe.

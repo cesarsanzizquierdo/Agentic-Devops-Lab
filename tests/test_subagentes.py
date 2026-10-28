@@ -1,14 +1,19 @@
 """Tests de los subagentes de .claude/agents/.
 
 Comprueban que cada subagente tiene las herramientas que su rol permite y
-ninguna mas. Un revisor con permiso de escritura dejaria de ser independiente.
+ninguna mas. Un revisor que pudiera escribir podria arreglar lo que critica: quien
+revisa no debe ser quien escribe.
 """
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
 CARPETA_AGENTES = RAIZ / ".claude" / "agents"
 
-HERRAMIENTAS_DE_ESCRITURA = ("Edit", "Write", "MultiEdit", "NotebookEdit", "Bash")
+HERRAMIENTAS_DEL_REVISOR = {"Read", "Grep", "Glob"}
+HERRAMIENTAS_DEL_IMPLEMENTADOR = {"Read", "Grep", "Glob", "Edit", "Write", "Bash"}
+
+MODELO_DEL_REVISOR = "opus"
+MODELO_DEL_IMPLEMENTADOR = "sonnet"
 
 
 def leer_cabecera(nombre_fichero):
@@ -43,19 +48,15 @@ def test_los_dos_subagentes_declaran_nombre_y_descripcion():
         assert cabecera["description"], fichero
 
 
-def test_el_revisor_es_de_solo_lectura():
-    herramientas = herramientas_de("revisor.md")
-    for herramienta in HERRAMIENTAS_DE_ESCRITURA:
-        assert herramienta not in herramientas, herramienta
+def test_el_revisor_tiene_exactamente_sus_herramientas():
+    assert set(herramientas_de("revisor.md")) == HERRAMIENTAS_DEL_REVISOR
 
 
-def test_el_revisor_puede_leer_para_dar_contexto():
-    herramientas = herramientas_de("revisor.md")
-    assert "Read" in herramientas
-    assert "Grep" in herramientas
+def test_el_implementador_tiene_exactamente_sus_herramientas():
+    assert set(herramientas_de("implementador.md")) == HERRAMIENTAS_DEL_IMPLEMENTADOR
 
 
-def test_el_implementador_puede_editar_y_ejecutar_tests():
-    herramientas = herramientas_de("implementador.md")
-    assert "Edit" in herramientas
-    assert "Bash" in herramientas
+def test_los_subagentes_fijan_su_modelo():
+    """Sin la linea model el subagente hereda el modelo de la sesion."""
+    assert leer_cabecera("revisor.md").get("model") == MODELO_DEL_REVISOR
+    assert leer_cabecera("implementador.md").get("model") == MODELO_DEL_IMPLEMENTADOR

@@ -16,6 +16,23 @@ HOOK_TESTS_COMMIT = RAIZ / "herramientas" / "hook_tests_commit.py"
 PERMITIDO = 0
 BLOQUEADO = 2
 
+RUTA_SETTINGS = RAIZ / ".claude" / "settings.json"
+
+# Una regla "deny" por cada fila de la tabla de limites de CLAUDE.md.
+REGLAS_DENY_OBLIGATORIAS = (
+    "Edit(manifiestos/**)",
+    "Edit(.github/workflows/**)",
+    "Edit(labs/*/verificar.py)",
+    "Edit(evals/dorado*/**)",
+    "Edit(src/aula/legado/**)",
+)
+
+# Las reglas con las que trabaja el agente: puede cambiarlas, pero siempre preguntando.
+REGLAS_ASK_OBLIGATORIAS = (
+    "Edit(.claude/**)",
+    "Edit(CLAUDE.md)",
+)
+
 
 def ejecutar_hook(hook, datos_herramienta):
     """Lanza el hook con el JSON que enviaria Claude Code y devuelve el proceso terminado."""
@@ -26,6 +43,26 @@ def ejecutar_hook(hook, datos_herramienta):
 
 def codigo_hook_rutas(ruta):
     return ejecutar_hook(HOOK_RUTAS, {"file_path": str(ruta)}).returncode
+
+
+def leer_permisos():
+    """Devuelve el bloque "permissions" de .claude/settings.json."""
+    configuracion = json.loads(RUTA_SETTINGS.read_text(encoding="utf-8"))
+    return configuracion["permissions"]
+
+
+def test_settings_prohibe_las_rutas_de_limites():
+    """Si alguien borra una regla deny, el hook sigue funcionando y nadie lo notaria sin este test."""
+    reglas_deny = leer_permisos()["deny"]
+    for regla in REGLAS_DENY_OBLIGATORIAS:
+        assert regla in reglas_deny, regla
+
+
+def test_settings_pregunta_antes_de_cambiar_las_reglas_del_agente():
+    """Si alguien quita la regla ask, el agente podria cambiar sus propias reglas sin preguntar."""
+    reglas_ask = leer_permisos().get("ask", [])
+    for regla in REGLAS_ASK_OBLIGATORIAS:
+        assert regla in reglas_ask, regla
 
 
 def test_hook_rutas_bloquea_manifiestos_con_barras_normales():
@@ -50,6 +87,12 @@ def test_hook_rutas_bloquea_todas_las_rutas_de_limites():
     ]
     for ruta in rutas_protegidas:
         assert codigo_hook_rutas(ruta) == BLOQUEADO, ruta
+
+
+def test_hook_rutas_deja_pasar_las_reglas_del_agente_porque_se_preguntan():
+    # .claude/ y CLAUDE.md no se bloquean: la regla "ask" de settings.json pide confirmacion.
+    assert codigo_hook_rutas(".claude/agents/revisor.md") == PERMITIDO
+    assert codigo_hook_rutas("CLAUDE.md") == PERMITIDO
 
 
 def test_hook_rutas_no_se_engana_con_rodeos():
