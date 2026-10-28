@@ -2,6 +2,7 @@ import pytest
 from dataclasses import replace
 from fastapi import HTTPException
 
+from aula import auditoria
 from aula.api.app import crear_matricula, SolicitudEntrada
 from aula.reglas.motor import (evaluar_solicitud, VentanaCerrada, VentanaMatricula, 
                                Grupo, ordenar_por_prioridad)
@@ -203,3 +204,34 @@ def test_limite_umbral_fin_carrera():
         matricula_resultante = evaluar_solicitud(solicitud_matricula, expediente_alumno, plan_estudios, ventana_matricula, {})
         assert matricula_resultante.lineas[0].admitida is True
         assert matricula_resultante.lineas[1].admitida is True
+
+def test_codigo_fuera_de_plan_rechaza_solo_esa_linea(monkeypatch, tmp_path):
+    """cubre: SPEC-001/INV-01, SPEC-001/INV-02. Resolucion A-03."""
+    traza = tmp_path / "auditoria.jsonl"
+    monkeypatch.setattr(auditoria, "RUTA_TRAZA", traza)
+    ventana_matricula = VentanaMatricula("2026-09-01T00:00:00", "2026-09-30T23:59:59")
+    matricula_resultante = evaluar_solicitud(solicitud(["MAT101", "NOEXISTE"]), expediente(), plan(), ventana_matricula, {})
+    assert len(matricula_resultante.lineas) == 2
+    assert matricula_resultante.lineas[0].admitida is True
+    assert not matricula_resultante.lineas[1].admitida
+    assert "no pertenece al plan" in matricula_resultante.lineas[1].motivo_rechazo
+    assert len(auditoria.leer_traza(traza)) == 1
+
+def test_ventana_interpreta_instantes_sin_zona_como_utc():
+    """cubre: SPEC-001/CA-01. Resolucion A-04: 01:30+02:00 del 1 de octubre son las 23:30 UTC del 30 de septiembre."""
+    ventana_matricula = VentanaMatricula("2026-09-01T00:00:00", "2026-09-30T23:59:59")
+    assert ventana_matricula.contiene("2026-10-01T01:30:00+02:00")
+    assert not ventana_matricula.contiene("2026-10-01T00:00:00+00:00")
+
+def test_orden_prioridad_con_momentos_con_y_sin_zona():
+    """cubre: SPEC-001/CA-07. Resolucion A-04: a igualdad de creditos, 09:00+00:00 va antes que 10:00 sin zona."""
+    solicitud_a = solicitud(["MAT101"], estudiante="A", momento="2026-09-10T10:00:00")
+    solicitud_b = solicitud(["MAT101"], estudiante="B", momento="2026-09-10T09:00:00+00:00")
+    ordenadas = ordenar_por_prioridad([solicitud_a, solicitud_b], {}, plan())
+    assert [s.estudiante_id for s in ordenadas] == ["B", "A"]
+
+def test_api_crear_matricula_sin_momento():
+    """cubre: SPEC-001/INV-01. Resolucion A-04: el momento por defecto de la API lleva zona horaria."""
+    entrada = SolicitudEntrada(estudiante_id="EST-0001", curso_academico="2026-2027", codigos=["MAT101"])
+    matricula_resultante = crear_matricula(entrada)
+    assert len(matricula_resultante.lineas) == 1

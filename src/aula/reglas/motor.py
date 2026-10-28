@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from ..auditoria import registrar_decision
 from ..dominio.modelos import Expediente, Matricula, Plan, SolicitudMatricula, EstadoMatricula, LineaMatricula
 
@@ -11,14 +11,21 @@ class VentanaCerrada(Exception):
     pass
 
 
+def instante_utc(momento: str) -> datetime:
+    """SPEC-001 A-04: un instante sin zona horaria se interpreta como UTC."""
+    t = datetime.fromisoformat(momento)
+    if t.tzinfo is None:
+        return t.replace(tzinfo=timezone.utc)
+    return t.astimezone(timezone.utc)
+
+
 @dataclass(frozen=True)
 class VentanaMatricula:
     inicio: str
     fin: str
 
     def contiene(self, momento: str) -> bool:
-        t = datetime.fromisoformat(momento)
-        return datetime.fromisoformat(self.inicio) <= t <= datetime.fromisoformat(self.fin)
+        return instante_utc(self.inicio) <= instante_utc(momento) <= instante_utc(self.fin)
         #raise NotImplementedError("S1: comprobar la ventana de matricula")
 
 
@@ -80,6 +87,10 @@ def evaluar_solicitud(solicitud: SolicitudMatricula, expediente: Expediente,
     creditos_acumulados = 0
 
     for codigo in solicitud.codigos:
+        if codigo not in plan.asignaturas:
+            # SPEC-001 A-03: se rechaza solo esta linea, sin afectar al resto
+            lineas.append(LineaMatricula(codigo, 0, False, False, "asignatura no pertenece al plan"))
+            continue
         asig = plan.asignatura(codigo)
         faltan = []
         
@@ -125,7 +136,7 @@ def ordenar_por_prioridad(solicitudes: list[SolicitudMatricula],
         solicitudes,
         key=lambda s: (
             -prioridad(expedientes.get(s.estudiante_id, Expediente(s.estudiante_id, plan.codigo)), plan),
-            datetime.fromisoformat(s.momento),
+            instante_utc(s.momento),
         ),
     )
     #raise NotImplementedError("S1: ordenar solicitudes segun SPEC-001")
