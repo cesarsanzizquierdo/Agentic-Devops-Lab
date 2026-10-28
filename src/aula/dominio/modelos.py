@@ -85,9 +85,19 @@ class Expediente:
         return any(r.estado is EstadoRegistro.CONVALIDADA
                    for r in self.registros_de(codigo))
 
-    def ultimo_intento_aprobado(self, codigo: str):
-        """S2: completar este helper si la normativa acordada lo requiere."""
-        raise NotImplementedError("S2: seleccionar registro tras resolver SPEC-002")
+    def ultimo_intento_aprobado(self, codigo: str) -> Optional[RegistroAcademico]:
+            """Busca y devuelve el registro aprobado con el numero de convocatoria mas alto."""
+            registros_asignatura = self.registros_de(codigo)
+            ultimo_aprobado = None
+
+            for registro in registros_asignatura:
+                if registro.estado == EstadoRegistro.APROBADA:
+                    if ultimo_aprobado is None:
+                        ultimo_aprobado = registro
+                    elif registro.convocatoria > ultimo_aprobado.convocatoria:
+                        ultimo_aprobado = registro
+
+            return ultimo_aprobado
 
 
 @dataclass

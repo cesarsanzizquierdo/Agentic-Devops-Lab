@@ -10,6 +10,7 @@ from tests.utilidades import plan, expediente, registro, solicitud
 
 
 def test_ca01_ventana_cerrada():
+    """cubre: SPEC-001/CA-01"""
     plan_estudios = plan()
     expediente_alumno = expediente()
     solicitud_matricula = solicitud(["MAT101"], momento="2026-10-01T00:00:00")
@@ -18,6 +19,7 @@ def test_ca01_ventana_cerrada():
         evaluar_solicitud(solicitud_matricula, expediente_alumno, plan_estudios, ventana_matricula, {})
 
 def test_ca02_prerrequisito_no_superado():
+    """cubre: SPEC-001/CA-02"""
     plan_estudios = plan()
     expediente_alumno = expediente()
     solicitud_matricula = solicitud(["EST101"])
@@ -27,6 +29,7 @@ def test_ca02_prerrequisito_no_superado():
     assert "prerrequisitos pendientes: MAT101" in matricula_resultante.lineas[0].motivo_rechazo
 
 def test_ca03_limite_creditos_superado():
+    """cubre: SPEC-001/CA-03"""
     plan_base = plan()
     plan_estudios = replace(plan_base, limite_creditos_curso=10) # Forzamos un limite bajo de 10
     expediente_alumno = expediente()
@@ -42,6 +45,7 @@ def test_ca03_limite_creditos_superado():
     assert "limite de creditos" in rechazadas[0].motivo_rechazo
 
 def test_ca04_convocatorias_agotadas():
+    """cubre: SPEC-001/CA-04"""
     plan_estudios = plan()
     expediente_alumno = expediente(
         registro("MAT101", "suspensa", convocatoria=1), registro("MAT101", "suspensa", convocatoria=2),
@@ -55,6 +59,7 @@ def test_ca04_convocatorias_agotadas():
     assert "convocatorias agotadas" in matricula_resultante.lineas[0].motivo_rechazo
 
 def test_ca05_grupo_completo():
+    """cubre: SPEC-001/CA-05"""
     plan_estudios = plan()
     expediente_alumno = expediente()
     solicitud_matricula = solicitud(["MAT101", "FIS101"])
@@ -67,6 +72,7 @@ def test_ca05_grupo_completo():
     assert matricula_resultante.lineas[1].admitida is True
 
 def test_ca06_convalidacion_cuenta_superada():
+    """cubre: SPEC-001/CA-06"""
     plan_estudios = plan()
     expediente_alumno = expediente(registro("MAT101", "convalidada"))
     solicitud_matricula = solicitud(["EST101"])
@@ -75,6 +81,7 @@ def test_ca06_convalidacion_cuenta_superada():
     assert matricula_resultante.lineas[0].admitida is True
 
 def test_ca07_orden_prioridad():
+    """cubre: SPEC-001/CA-07"""
     plan_estudios = plan()
     expediente_a = expediente(registro("MAT101", "aprobada"), estudiante="A")
     expediente_b = expediente(registro("MAT101", "aprobada"), registro("FIS101", "aprobada"), estudiante="B")
@@ -84,6 +91,7 @@ def test_ca07_orden_prioridad():
     assert ordenadas[0].estudiante_id == "B"
 
 def test_ca08_ya_superada():
+    """cubre: SPEC-001/CA-08"""
     plan_estudios = plan()
     expediente_alumno = expediente(registro("MAT101", "aprobada"))
     solicitud_matricula = solicitud(["MAT101"])
@@ -146,12 +154,14 @@ def test_transicion_estado_invalida():
         transicionar(matricula_inicial, EstadoMatricula.CERRADA)
 
 def test_plan_inmutable_bloqueo():
+    """cubre: SPEC-001/INV-03"""
     matricula_inicial = evaluar_solicitud(solicitud(["MAT101"]), expediente(), plan(), VentanaMatricula("2020-01-01T00:00:00", "2030-01-01T00:00:00"), {})
     matricula_confirmada = transicionar(matricula_inicial, EstadoMatricula.CONFIRMADA)
     with pytest.raises(PlanInmutable):
         transicionar(matricula_confirmada, EstadoMatricula.EN_CURSO, nuevo_plan="OTRO-PLAN")
 
 def test_api_crear_matricula():
+    """cubre: SPEC-001/INV-01, SPEC-001/INV-02"""
     entrada = SolicitudEntrada(
         estudiante_id="EST-0001",
         curso_academico="2026-2027",
