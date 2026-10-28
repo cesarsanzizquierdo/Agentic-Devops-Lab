@@ -75,3 +75,16 @@ esa suposición.
 
 Cuando encuentres una ambigüedad, escríbela en el apartado de ambigüedades de la
 spec correspondiente antes de implementar nada.
+
+## Subagentes
+
+Quien escribe el código no es quien lo revisa. Hay dos subagentes en
+`.claude/agents/`:
+
+| Subagente | Cuándo usarlo | Qué puede hacer |
+|-----------|---------------|-----------------|
+| `implementador` | El encargo está decidido y la spec no tiene ambigüedades abiertas | Leer, editar, escribir y ejecutar tests |
+| `revisor` | Antes de abrir un PR | Solo leer. Revisa únicamente el diff que se le entrega, con la checklist del PR |
+
+El revisor solo puede leer, a propósito. Si no puede editar, no puede arreglar
+lo que critica: quien revisa no es quien escribe.
