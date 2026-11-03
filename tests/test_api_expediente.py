@@ -51,6 +51,33 @@ def test_spec002_ca08_valores_son_string_y_no_float(consultar):
         assert isinstance(cuerpo[campo], str)
 
 
+def test_spec002_ca08_formatear_decimal_con_dos_decimales_se_devuelve_igual():
+    """cubre: SPEC-002/CA-08. Un valor con exactamente dos decimales sale tal cual, sin redondear."""
+    assert api.formatear_decimal(Decimal("7.00")) == "7.00"
+    assert api.formatear_decimal(Decimal("6.80")) == "6.80"
+    assert api.formatear_decimal(Decimal("0.00")) == "0.00"
+
+
+@pytest.mark.parametrize(
+    "texto",
+    ["7.815", "7.800", "7.0", "7", "NaN", "Infinity"],
+)
+def test_spec002_ca08_formatear_decimal_no_cuantizado_lanza_error(texto):
+    """cubre: SPEC-002/CA-08. Sin dos decimales exactos lanza ValueError con el valor, no redondea."""
+    valor = Decimal(texto)
+
+    with pytest.raises(ValueError) as error:
+        api.formatear_decimal(valor)
+
+    assert repr(valor) in str(error.value)
+
+
+def test_spec002_ca08_formatear_decimal_no_devuelve_siete_ochenta_y_dos():
+    """cubre: SPEC-002/CA-08. Decimal("7.815") lanza error y no devuelve "7.82" por redondeo."""
+    with pytest.raises(ValueError):
+        api.formatear_decimal(Decimal("7.815"))
+
+
 def test_spec002_ca08_progreso_pct_es_alias_de_progreso(consultar):
     """cubre: SPEC-002/CA-08. 15 creditos de 192 = 7.8125 -> "7.81" en ambos campos."""
     cuerpo = json.loads(consultar("EST-API-3", {"MAT101": "8.00", "PRG101": "6.00"}))

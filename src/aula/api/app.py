@@ -97,7 +97,15 @@ def crear_matricula(entrada: SolicitudEntrada):
 
 
 def formatear_decimal(valor: Decimal) -> str:
-    """Texto con dos decimales fijos. El valor ya llega redondeado: aqui no se redondea."""
+    """Texto con dos decimales fijos. Aqui nunca se redondea (SPEC-002, CA-08 y A-05).
+
+    El valor debe llegar ya cuantizado a exactamente dos decimales ("7.00", "6.80").
+    Si no, lanza ValueError con el valor recibido en lugar de redondear en silencio.
+    Eso incluye "7", "7.0", "7.800", "7.815", NaN e Infinity. Para los no finitos el
+    exponente no es un entero, asi que tambien fallan en la comparacion.
+    """
+    if valor.as_tuple().exponent != -2:
+        raise ValueError(f"se esperaban dos decimales: {valor!r}")
     return f"{valor:.2f}"
 
 
