@@ -102,8 +102,8 @@ le ocurrio lo mismo. Evidencia: `labs/S3-contexto/error_opencode.png`.
 Comprobado despues: sin cambios ni ficheros nuevos en el repo (salvo la captura), sin commits en
 las ramas de prueba y 54 tests en verde. Las ramas de prueba se borraron (eran solo locales).
 
-Pendiente: S3-05 sigue en rojo. Hay que decidir con el mentor como cerrar la comparativa sin
-acceso gratuito a OpenCode.
+S3-05 se cierra con una comparativa documental (ver `comparativa.md`), pendiente de validar con
+el mentor.
 
 ## Punto 5: ciclo escritor/revisor en worktrees paralelos con Orca
 
