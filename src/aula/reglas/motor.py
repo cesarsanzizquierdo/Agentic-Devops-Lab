@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from ..auditoria import registrar_decision
 from ..dominio.modelos import Expediente, Matricula, Plan, SolicitudMatricula, EstadoMatricula, LineaMatricula
+from .media import creditos_superados
 
 
 class VentanaCerrada(Exception):
@@ -41,19 +42,10 @@ class Grupo:
         #raise NotImplementedError("S1: comprobar la capacidad del grupo")
 
 
-def creditos_superados(expediente: Expediente, plan: Plan) -> int:
-    total_creditos = 0
-    for cod_asignatura, asignatura in plan.asignaturas.items():
-        if expediente.superada(cod_asignatura):
-            total_creditos += asignatura.creditos
-    return total_creditos
-   # raise NotImplementedError("S1: calcular creditos superados segun SPEC-001")
-
-
 def creditos_pendientes(expediente: Expediente, plan: Plan) -> int:
     superados = creditos_superados(expediente, plan)
     restantes = plan.creditos_titulo - superados
-    
+
     if restantes < 0:
         return 0
     return restantes
@@ -93,7 +85,7 @@ def evaluar_solicitud(solicitud: SolicitudMatricula, expediente: Expediente,
             continue
         asig = plan.asignatura(codigo)
         faltan = []
-        
+
         for p in asig.prerrequisitos:
             if not expediente.superada(p):
                 faltan.append(p)
