@@ -28,7 +28,7 @@ GRUPOS_ACTUALES = {}
 try:
     archivo_expedientes = RUTA_DATOS / "expedientes_sinteticos.json"
     datos_estudiantes = json.loads(archivo_expedientes.read_text(encoding="utf-8"))
-    
+
     for datos_alumno in datos_estudiantes:
         registros_historial = []
 
@@ -46,11 +46,11 @@ try:
                 nota=nota_decimal
             )
             registros_historial.append(nuevo_registro)
-            
+
         estudiante_id = datos_alumno["estudiante_id"]
         plan_alumno = datos_alumno["plan"]
         BD_EXPEDIENTES[estudiante_id] = Expediente(estudiante_id, plan_alumno, registros_historial)
-        
+
 except FileNotFoundError:
     pass
 
@@ -69,16 +69,16 @@ def salud():
 @app.post("/matriculas")
 def crear_matricula(entrada: SolicitudEntrada):
     momento_solicitud = entrada.momento or datetime.now(timezone.utc).isoformat()
-    
+
     solicitud = SolicitudMatricula(
         estudiante_id=entrada.estudiante_id,
         curso_academico=entrada.curso_academico,
         codigos=entrada.codigos,
         momento=momento_solicitud
     )
-    
+
     expediente = BD_EXPEDIENTES.get(
-        entrada.estudiante_id, 
+        entrada.estudiante_id,
         Expediente(entrada.estudiante_id, PLAN_ACTUAL.codigo, [])
     )
     try:
@@ -96,6 +96,11 @@ def crear_matricula(entrada: SolicitudEntrada):
     #raise HTTPException(status_code=501, detail="S1: alta de matricula pendiente")
 
 
+def formatear_decimal(valor: Decimal) -> str:
+    """Texto con dos decimales fijos. El valor ya llega redondeado: aqui no se redondea."""
+    return f"{valor:.2f}"
+
+
 @app.get("/expedientes/{estudiante_id}")
 def ver_expediente(estudiante_id: str):
     if estudiante_id not in BD_EXPEDIENTES:
@@ -107,10 +112,10 @@ def ver_expediente(estudiante_id: str):
     respuesta = {
         "estudiante_id": datos_resumen["estudiante_id"],
         "plan": datos_resumen["plan"],
-        "nota_media": float(datos_resumen["nota_media"]),
+        "nota_media": formatear_decimal(datos_resumen["nota_media"]),
         "creditos_superados": datos_resumen["creditos_superados"],
-        "progreso": float(datos_resumen["progreso"]),
-        "progreso_pct": float(datos_resumen["progreso_pct"]),
+        "progreso": formatear_decimal(datos_resumen["progreso"]),
+        "progreso_pct": formatear_decimal(datos_resumen["progreso_pct"]),
         "convocatorias": datos_resumen["convocatorias"],
     }
     return respuesta
