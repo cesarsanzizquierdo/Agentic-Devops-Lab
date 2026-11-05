@@ -6,11 +6,7 @@ estandar: sin SDK, para que el student vea el protocolo por dentro antes de
 usar una abstraccion que se lo oculte.
 
 Arranque:
-    python3 -m agentes.mcp_aula.servidor
-
-Registro en Claude Code (.mcp.json):
-    {"mcpServers": {"aula-contexto": {"command": "python3",
-     "args": ["-m", "agentes.mcp_aula.servidor"]}}}
+    python agentes/mcp_aula/servidor.py
 """
 from __future__ import annotations
 
@@ -22,6 +18,14 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
 PROTOCOLO = "2024-11-05"
+SERVIDOR = {"name": "aula-contexto", "version": "1.0.0"}
+
+# Codigos de error estandar de JSON-RPC 2.0.
+ERROR_JSON_INVALIDO = -32700
+ERROR_PETICION_INVALIDA = -32600
+ERROR_METODO_DESCONOCIDO = -32601
+ERROR_PARAMETROS_INVALIDOS = -32602
+ERROR_INTERNO = -32603
 
 HERRAMIENTAS = [
     {
@@ -170,7 +174,86 @@ IMPLEMENTACION = {
 # --- transporte JSON-RPC sobre stdio ------------------------------------------
 
 def manejar(mensaje: dict):
-    raise NotImplementedError("S4a: implementar initialize, tools/list y tools/call")
+    """Responde a un mensaje JSON-RPC 2.0. Devuelve None si es una notificacion.
+
+    Una notificacion es un mensaje sin "id": el cliente avisa de algo y no espera
+    respuesta (por ejemplo "notifications/initialized" despues del saludo).
+    """
+    if "id" not in mensaje:
+        return None
+    if "method" not in mensaje:
+        return None     # es una respuesta del cliente: JSON-RPC prohibe contestarla
+
+    ident = mensaje["id"]
+    metodo = mensaje["method"]
+    parametros = mensaje.get("params") or {}
+
+    if mensaje.get("jsonrpc") != "2.0" or not isinstance(metodo, str):
+        return _error(ident, ERROR_PETICION_INVALIDA, "se esperaba jsonrpc 2.0 y un method de texto")
+
+    if metodo == "initialize":
+        return _ok(ident, {
+            "protocolVersion": PROTOCOLO,
+            "capabilities": {"tools": {}},
+            "serverInfo": SERVIDOR,
+        })
+    if metodo == "ping":
+        return _ok(ident, {})
+    if metodo == "tools/list":
+        return _ok(ident, {"tools": HERRAMIENTAS})
+    if metodo == "tools/call":
+        return _llamar_herramienta(ident, parametros)
+    return _error(ident, ERROR_METODO_DESCONOCIDO, "metodo no soportado: %s" % metodo)
+
+
+def _llamar_herramienta(ident, parametros) -> dict:
+    # Errores del cliente (pide algo que no existe o mal formado): error de protocolo.
+    # Se comprueban los tipos antes de usarlos: un "arguments": 5 no debe tumbar el servidor.
+    if not isinstance(parametros, dict):
+        return _error(ident, ERROR_PARAMETROS_INVALIDOS, "params debe ser un objeto")
+    nombre = parametros.get("name")
+    argumentos = parametros.get("arguments")
+    if argumentos is None:
+        argumentos = {}     # una herramienta sin argumentos puede llegar sin "arguments"
+    if not isinstance(nombre, str) or not isinstance(argumentos, dict):
+        return _error(ident, ERROR_PARAMETROS_INVALIDOS,
+                      "name debe ser texto y arguments un objeto")
+
+    if nombre not in IMPLEMENTACION:
+        return _error(ident, ERROR_PARAMETROS_INVALIDOS, "herramienta desconocida: %s" % nombre)
+    faltan = _argumentos_que_faltan(nombre, argumentos)
+    if faltan:
+        return _error(ident, ERROR_PARAMETROS_INVALIDOS,
+                      "faltan argumentos para %s: %s" % (nombre, ", ".join(faltan)))
+
+    # Errores de la herramienta: se devuelven como resultado con isError, para que
+    # el modelo los lea y pueda corregirse en lugar de perder la conexion.
+    try:
+        resultado = IMPLEMENTACION[nombre](argumentos)
+    except Exception as fallo:
+        error = {"error": "%s: %s" % (type(fallo).__name__, fallo)}
+        return _ok(ident, _contenido(error, es_error=True))
+    return _ok(ident, _contenido(resultado, es_error="error" in resultado))
+
+
+def _argumentos_que_faltan(nombre: str, argumentos: dict) -> list:
+    """Compara los argumentos recibidos con los "required" del inputSchema de la herramienta."""
+    obligatorios = []
+    for herramienta in HERRAMIENTAS:
+        if herramienta["name"] == nombre:
+            obligatorios = herramienta["inputSchema"]["required"]
+
+    faltan = []
+    for argumento in obligatorios:
+        if argumento not in argumentos:
+            faltan.append(argumento)
+    return faltan
+
+
+def _contenido(datos: dict, es_error: bool) -> dict:
+    """Envuelve el resultado como lo espera MCP: una lista de bloques de texto."""
+    texto = json.dumps(datos, ensure_ascii=False, indent=2)
+    return {"content": [{"type": "text", "text": texto}], "isError": es_error}
 
 
 def _ok(ident, resultado):
@@ -181,8 +264,40 @@ def _error(ident, codigo, mensaje):
     return {"jsonrpc": "2.0", "id": ident, "error": {"code": codigo, "message": mensaje}}
 
 
+def responder_linea(linea: str):
+    """Convierte una linea de texto en respuesta. Devuelve None si no hay que contestar."""
+    try:
+        mensaje = json.loads(linea)
+    except json.JSONDecodeError:
+        return _error(None, ERROR_JSON_INVALIDO, "la linea no es JSON valido")
+    if not isinstance(mensaje, dict):
+        return _error(None, ERROR_PETICION_INVALIDA, "se esperaba un objeto JSON-RPC")
+    return manejar(mensaje)
+
+
 def principal():
-    raise NotImplementedError("S4a: implementar transporte JSON-RPC por stdio")
+    """Transporte stdio: un mensaje JSON por linea en stdin, una respuesta por linea en stdout.
+
+    stdout es exclusivo del protocolo: cualquier otro print romperia la conversacion
+    con el cliente. La respuesta sale en ASCII (tildes escapadas como \\u00f3) para
+    no depender de la codificacion de la consola, que en Windows no es UTF-8.
+    """
+    # errors="replace": un byte invalido se convierte en el caracter de reemplazo (U+FFFD)
+    # en vez de cortar el bucle.
+    sys.stdin.reconfigure(encoding="utf-8", errors="replace")
+    for linea in sys.stdin:
+        linea = linea.strip()
+        if not linea:
+            continue
+        try:
+            respuesta = responder_linea(linea)
+        except Exception as fallo:
+            # Red de seguridad: un fallo inesperado no debe matar el proceso,
+            # porque el cliente perderia el servidor para el resto de la sesion.
+            respuesta = _error(None, ERROR_INTERNO, "error interno: %s" % fallo)
+        if respuesta is not None:
+            sys.stdout.write(json.dumps(respuesta) + "\n")
+            sys.stdout.flush()
 
 
 if __name__ == "__main__":
