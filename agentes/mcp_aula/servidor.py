@@ -7,17 +7,35 @@ usar una abstraccion que se lo oculte.
 
 Arranque:
     python agentes/mcp_aula/servidor.py
+
+Registro en Claude Code: .mcp.json en la raiz del repositorio. Se lanza el fichero
+por su ruta y no con "-m" porque Claude Code no garantiza que el proceso arranque
+en la raiz; RAIZ se calcula desde este fichero. "python" debe ser el del .venv,
+que tiene pytest (lo necesita resultado_tests).
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
+
+# El paquete "aula" vive en src/ y no esta instalado: igual que tests/conftest.py,
+# se anade al path para reutilizar la carga de planes del proyecto.
+if str(RAIZ / "src") not in sys.path:
+    sys.path.insert(0, str(RAIZ / "src"))
+
+from aula.reglas.planes import RUTA_PLANES, cargar_plan  # noqa: E402
+
 PROTOCOLO = "2024-11-05"
+TIEMPO_MAXIMO_TESTS = 120  # segundos
+# Ultima linea de pytest cuando ha ejecutado tests: "4 passed in 0.05s", "1 failed, 3 passed in 1.2s".
+RESUMEN_PYTEST = re.compile(r"^\d+ .+ in \d")
+PATRON_CODIGO_PLAN = re.compile(r"^PLAN-\d{4}$")
 SERVIDOR = {"name": "aula-contexto", "version": "1.0.0"}
 
 # Codigos de error estandar de JSON-RPC 2.0.
@@ -154,12 +172,92 @@ def trazabilidad(args: dict) -> dict:
     }
 
 
+def ruta_de_tests_permitida(ruta: str) -> bool:
+    """True solo si la ruta queda dentro de tests/.
+
+    La herramienta la puede llamar cualquier agente, asi que no debe servir para
+    ejecutar codigo fuera de la suite.
+    """
+    ruta = ruta.replace("\\", "/")
+    partes = ruta.split("/")
+    # Exigir que empiece por "tests" ya descarta las rutas absolutas ("/etc", "C:/...")
+    # y las opciones de pytest ("-p plugin"), que este tomaria como parametros.
+    if partes[0] != "tests" or ".." in partes:
+        return False    # ".." seria un rodeo para salir: "tests/../src"
+
+    # Segunda barrera: la ruta real en disco (sin "::test_x") debe seguir dentro de tests/.
+    fichero = ruta.split("::")[0]
+    real = (RAIZ / fichero).resolve()
+    carpeta_tests = (RAIZ / "tests").resolve()
+    return real == carpeta_tests or carpeta_tests in real.parents
+
+
 def resultado_tests(args: dict) -> dict:
-    raise NotImplementedError("S4a: ejecutar tests con limites de rutas y recursos")
+    ruta = args.get("ruta") or "tests/"
+    if not ruta_de_tests_permitida(ruta):
+        return {"error": "ruta no permitida: %s. Solo se aceptan rutas dentro de tests/" % ruta}
+
+    comando = [sys.executable, "-m", "pytest", ruta, "-q", "-rfE", "--no-header",
+               "-p", "no:cacheprovider"]
+    # La salida de pytest se captura: stdout es del protocolo y no puede llevar nada mas.
+    entorno = dict(os.environ, PYTHONIOENCODING="utf-8")
+    try:
+        # stdin=DEVNULL: pytest no hereda el canal por el que llegan los mensajes MCP.
+        proceso = subprocess.run(comando, cwd=RAIZ, capture_output=True, env=entorno,
+                                 stdin=subprocess.DEVNULL, encoding="utf-8",
+                                 errors="replace", timeout=TIEMPO_MAXIMO_TESTS)
+    except subprocess.TimeoutExpired:
+        return {"error": "tiempo agotado: los tests tardaron mas de %d segundos"
+                         % TIEMPO_MAXIMO_TESTS}
+
+    lineas = proceso.stdout.strip().splitlines()
+    resumen = ""
+    if lineas:
+        resumen = lineas[-1]
+
+    # Si pytest ejecuta los tests sale con 0 (todo pasa) o 1 (alguno falla) y termina con una
+    # linea de resumen como "3 passed in 0.10s". Si no, no llego a ejecutarlos y se devuelve
+    # el motivo: codigo 4 si la ruta no existe, o codigo 1 con "No module named pytest" si
+    # este python no tiene pytest (con el codigo solo, pareceria que fallan los tests).
+    if proceso.returncode not in (0, 1) or not RESUMEN_PYTEST.match(resumen):
+        motivo = (proceso.stderr.strip() or proceso.stdout.strip() or "sin salida")
+        return {"error": "pytest no ejecuto los tests (codigo %d): %s"
+                         % (proceso.returncode, motivo[-500:])}
+
+    fallidos = []
+    for linea in lineas:
+        if linea.startswith("FAILED ") or linea.startswith("ERROR "):
+            fallidos.append(linea)
+
+    return {
+        "ruta": ruta,
+        "ok": proceso.returncode == 0,
+        "codigo_salida": proceso.returncode,
+        "resumen": resumen,
+        "fallidos": fallidos,
+    }
 
 
 def version_plan(args: dict) -> dict:
-    raise NotImplementedError("S4a: exponer version y parametros del plan")
+    codigo = args["codigo"].strip().upper()
+    # El codigo acaba siendo un nombre de fichero: sin esta comprobacion,
+    # "../specs/SPEC-001" intentaria abrir un fichero fuera de datos/planes.
+    if not PATRON_CODIGO_PLAN.match(codigo):
+        return {"error": "codigo de plan no valido: %s. Formato esperado: PLAN-AAAA"
+                         % args["codigo"]}
+    if not (RUTA_PLANES / ("%s.json" % codigo)).is_file():
+        return {"error": "plan %s no encontrado" % codigo}
+
+    plan = cargar_plan(codigo)
+    return {
+        "codigo": plan.codigo,
+        "version": plan.version,
+        "creditos_titulo": plan.creditos_titulo,
+        "limite_creditos_curso": plan.limite_creditos_curso,
+        "max_convocatorias": plan.max_convocatorias,
+        "umbral_final_carrera": plan.umbral_final_carrera,
+        "asignaturas": len(plan.asignaturas),
+    }
 
 
 IMPLEMENTACION = {

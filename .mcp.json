@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "aula-contexto": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["${CLAUDE_PROJECT_DIR:-.}/agentes/mcp_aula/servidor.py"]
+    }
+  }
+}
