@@ -7,3 +7,6 @@ htmlcov/
 .aula/informe_equivalencia.json
 datos/expedientes_sinteticos.json
 .venv/
+
+# Conjunto de evaluacion del mentor: no se sube al repositorio (README, "Evaluacion del agente").
+evals/dorado*/
