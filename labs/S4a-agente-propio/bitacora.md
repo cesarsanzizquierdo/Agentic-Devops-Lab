@@ -47,4 +47,11 @@ Revision (revisor, Opus): APROBAR CON CAMBIOS. Se aplicaron:
 El trabajo se partio en tres PRs para no pasar de 400 lineas: control de workflows,
 transporte y herramientas.
 
-Prueba en vivo desde Claude Code: (pendiente)
+Prueba en vivo desde Claude Code: al reiniciar, Claude Code cargo `aula-contexto` desde
+`.mcp.json` y aparecieron sus cinco herramientas (`mcp__aula-contexto__...`). Llamadas reales:
+
+- `trazabilidad("SPEC-002")`: 11 criterios, 100 % cubiertos, con el test que cubre cada uno.
+- `version_plan("PLAN-2024")`: version 1.2.0, 192 creditos, 6 convocatorias, 30 asignaturas.
+
+Sorpresa: VS Code tiene su propio menu "Add MCP Server" (para Copilot), que no es el de
+Claude Code. No hace falta usarlo: Claude Code lee `.mcp.json` solo.
