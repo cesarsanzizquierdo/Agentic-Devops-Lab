@@ -33,6 +33,8 @@ from aula.reglas.planes import RUTA_PLANES, cargar_plan  # noqa: E402
 
 PROTOCOLO = "2024-11-05"
 TIEMPO_MAXIMO_TESTS = 120  # segundos
+# Ultima linea de pytest cuando ha ejecutado tests: "4 passed in 0.05s", "1 failed, 3 passed in 1.2s".
+RESUMEN_PYTEST = re.compile(r"^\d+ .+ in \d")
 PATRON_CODIGO_PLAN = re.compile(r"^PLAN-\d{4}$")
 SERVIDOR = {"name": "aula-contexto", "version": "1.0.0"}
 
@@ -208,14 +210,20 @@ def resultado_tests(args: dict) -> dict:
         return {"error": "tiempo agotado: los tests tardaron mas de %d segundos"
                          % TIEMPO_MAXIMO_TESTS}
 
-    # pytest sale con 0 (todo pasa) o 1 (alguno falla). Otro codigo significa que no llego
-    # a ejecutar los tests, por ejemplo 4 si la ruta no existe: se devuelve el motivo.
-    if proceso.returncode not in (0, 1):
+    lineas = proceso.stdout.strip().splitlines()
+    resumen = ""
+    if lineas:
+        resumen = lineas[-1]
+
+    # Si pytest ejecuta los tests sale con 0 (todo pasa) o 1 (alguno falla) y termina con una
+    # linea de resumen como "3 passed in 0.10s". Si no, no llego a ejecutarlos y se devuelve
+    # el motivo: codigo 4 si la ruta no existe, o codigo 1 con "No module named pytest" si
+    # este python no tiene pytest (con el codigo solo, pareceria que fallan los tests).
+    if proceso.returncode not in (0, 1) or not RESUMEN_PYTEST.match(resumen):
         motivo = (proceso.stderr.strip() or proceso.stdout.strip() or "sin salida")
         return {"error": "pytest no ejecuto los tests (codigo %d): %s"
                          % (proceso.returncode, motivo[-500:])}
 
-    lineas = proceso.stdout.strip().splitlines()
     fallidos = []
     for linea in lineas:
         if linea.startswith("FAILED ") or linea.startswith("ERROR "):
@@ -225,7 +233,7 @@ def resultado_tests(args: dict) -> dict:
         "ruta": ruta,
         "ok": proceso.returncode == 0,
         "codigo_salida": proceso.returncode,
-        "resumen": lineas[-1] if lineas else "sin salida",
+        "resumen": resumen,
         "fallidos": fallidos,
     }
 

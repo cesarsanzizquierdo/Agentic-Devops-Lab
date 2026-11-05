@@ -1,6 +1,8 @@
 """Tests de lo que responde cada herramienta del servidor MCP (agentes/mcp_aula/servidor.py)."""
 import json
+import os
 import subprocess
+import sys
 
 import pytest
 
@@ -35,7 +37,7 @@ def test_trazabilidad_pone_cada_criterio_en_cubiertos_o_en_sin_cubrir():
     datos = datos_de(llamar_herramienta("trazabilidad", {"spec_id": "SPEC-002"}))
     criterios = datos_de(llamar_herramienta("obtener_spec", {"id": "SPEC-002"}))["criterios"]
 
-    # CA-01 tiene tests con "cubre: SPEC-002/CA-01" en tests/test_media_expediente.py.
+    # CA-01 tiene tests propios en tests/test_media_expediente.py.
     assert "CA-01" in datos["cubiertos"]
     assert sorted(list(datos["cubiertos"]) + datos["sin_cubrir"]) == criterios
 
@@ -81,6 +83,28 @@ def test_resultado_tests_rechaza_rutas_fuera_de_tests(ruta):
     assert "ruta no permitida" in resultado_tests({"ruta": ruta})["error"]
 
 
+def crear_enlace_a_carpeta(enlace, destino):
+    """Enlace simbolico; en Windows sin permisos, una junction (no los necesita)."""
+    try:
+        os.symlink(destino, enlace, target_is_directory=True)
+    except OSError:
+        if sys.platform != "win32":
+            raise
+        import _winapi
+        _winapi.CreateJunction(str(destino), str(enlace))
+
+
+def test_resultado_tests_rechaza_un_enlace_que_sale_de_tests(monkeypatch, tmp_path):
+    # El texto "tests/enlace" pasa la primera barrera; la ruta real en disco ya no esta en tests/.
+    monkeypatch.setattr(servidor, "RAIZ", tmp_path)
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "fuera").mkdir()
+    crear_enlace_a_carpeta(tmp_path / "tests" / "enlace", tmp_path / "fuera")
+
+    assert servidor.ruta_de_tests_permitida("tests/enlace") is False
+    assert servidor.ruta_de_tests_permitida("tests/test_x.py::test_a") is True
+
+
 def test_resultado_tests_ejecuta_un_fichero_de_la_suite():
     # Un fichero pequeno y rapido: ejecutar la suite entera desde un test la repetiria.
     resultado = resultado_tests({"ruta": "tests/test_subagentes.py"})
@@ -95,6 +119,29 @@ def test_resultado_tests_explica_por_que_no_se_ejecuto_una_ruta_inexistente():
 
     assert "codigo 4" in resultado["error"]
     assert "no_existe.py" in resultado["error"]
+
+
+def test_resultado_tests_avisa_si_este_python_no_tiene_pytest(monkeypatch):
+    # Sale con codigo 1, como cuando falla un test, pero no ha ejecutado ninguno.
+    pytest_simulado(monkeypatch, codigo=1, errores="No module named pytest")
+
+    resultado = resultado_tests({"ruta": "tests/"})
+
+    assert "No module named pytest" in resultado["error"]
+
+
+def test_resultado_tests_no_comparte_la_entrada_del_servidor_con_pytest(monkeypatch):
+    # Por stdin llegan los mensajes MCP: pytest no debe heredarlo.
+    recibidas = {}
+
+    def ejecutar(comando, **opciones):
+        recibidas.update(opciones)
+        return subprocess.CompletedProcess(comando, 0, stdout="1 passed in 0.01s", stderr="")
+    monkeypatch.setattr(servidor.subprocess, "run", ejecutar)
+
+    resultado_tests({"ruta": "tests/"})
+
+    assert recibidas["stdin"] is subprocess.DEVNULL
 
 
 def test_resultado_tests_lista_los_tests_que_fallan(monkeypatch):
