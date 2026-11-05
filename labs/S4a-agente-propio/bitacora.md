@@ -81,3 +81,23 @@ Pendiente y riesgos conocidos:
 
 Sorpresa: VS Code tiene su propio menu "Add MCP Server" (para Copilot), que no es el de
 Claude Code. No hace falta usarlo: Claude Code lee `.mcp.json` solo.
+
+## Punto 3: medicion del agente v0
+
+Antes de tocar el agente se mide el v0 de la semilla, para que el historial demuestre que la
+linea base es la de partida. Informe: `evals/informes/evaluacion_v0.json`.
+
+| Metrica | v0 |
+|---|---|
+| Casos | 15 (10 no conformes, 5 conformes) |
+| Matriz | vp 1, fp 0, vn 5, fn 9 |
+| Precision | 1,00 |
+| Recall | 0,10 |
+| F1 | 0,18 |
+
+Lectura: cuando acusa acierta, pero deja pasar 9 de los 10 PRs no conformes. Como gate es lo
+peor posible: da sensacion de control y no para casi nada.
+
+Por que, segun su codigo: el v0 dice "conforme" si algun fichero de
+tests/ menciona el identificador de la spec. No comprueba que criterio cubre cada test, que
+ficheros se tocan fuera del alcance ni si los tests comprueban algo de verdad.
