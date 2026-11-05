@@ -15,6 +15,7 @@ que tiene pytest (lo necesita resultado_tests).
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -125,27 +126,59 @@ def listar_specs(_=None) -> dict:
     return {"specs": salida}
 
 
+def rutas_de(texto: str) -> list:
+    """Rutas que la spec declara en su linea "Rutas:" (el alcance de los PRs que la implementan)."""
+    linea = _campo(texto, r"^Rutas:\s*(.+)$", defecto="")
+    rutas = []
+    for ruta in linea.split(","):
+        if ruta.strip():
+            rutas.append(ruta.strip())
+    return rutas
+
+
 def obtener_spec(args: dict) -> dict:
     ident = args["id"].upper()
     for ruta in _specs():
         if _id_de(ruta) == ident:
             texto = ruta.read_text(encoding="utf-8")
-            return {"id": ident, "criterios": criterios_de(texto), "contenido": texto}
+            return {"id": ident, "criterios": criterios_de(texto), "rutas": rutas_de(texto),
+                    "contenido": texto}
     return {"error": "spec %s no encontrada" % ident}
 
 
+def etiquetas_cubre(texto: str) -> dict:
+    """Para el codigo de un fichero de tests: {"SPEC-002/CA-01": ["test_a", ...]}.
+
+    Solo cuenta la etiqueta `cubre:` del docstring de cada test, no la de un comentario.
+    La usan trazabilidad (sobre el repo) y el agente de conformidad (sobre un PR), para
+    que "cubierto" signifique lo mismo en los dos sitios.
+    """
+    try:
+        arbol = ast.parse(texto)
+    except SyntaxError:
+        return {}       # si no es Python valido, pytest tampoco ejecutaria sus tests
+
+    mapa = {}
+    for nodo in ast.walk(arbol):
+        es_funcion = isinstance(nodo, (ast.FunctionDef, ast.AsyncFunctionDef))
+        if not es_funcion or not nodo.name.startswith("test_"):
+            continue
+        nombre, doc = nodo.name, ast.get_docstring(nodo) or ""
+        for etiqueta in re.findall(r"cubre:\s*([^\n\"]+)", doc):
+            for ref in re.findall(r"(SPEC-\d+|LEG)[/-]((?:CA|INV|CAR|EQU)[-\w]*)", etiqueta):
+                clave = "%s/%s" % (ref[0], ref[1])
+                mapa.setdefault(clave, []).append(nombre)
+    return mapa
+
+
 def _cubiertos() -> dict:
-    """Mapea criterio -> lista de tests que lo declaran mediante `cubre:`."""
+    """Mapea criterio -> lista de tests del repo que lo declaran mediante `cubre:`."""
     mapa = {}
     for ruta in (RAIZ / "tests").rglob("test_*.py"):
         texto = ruta.read_text(encoding="utf-8")
-        for bloque in re.finditer(r"def (test_\w+)\(.*?\):\s*(?:\"\"\"(.*?)\"\"\")?",
-                                  texto, re.S):
-            nombre, doc = bloque.group(1), bloque.group(2) or ""
-            for etiqueta in re.findall(r"cubre:\s*([^\n\"]+)", doc):
-                for ref in re.findall(r"(SPEC-\d+|LEG)[/-]((?:CA|INV|CAR|EQU)[-\w]*)", etiqueta):
-                    clave = "%s/%s" % (ref[0], ref[1])
-                    mapa.setdefault(clave, []).append("%s::%s" % (ruta.name, nombre))
+        for clave, tests in etiquetas_cubre(texto).items():
+            for nombre in tests:
+                mapa.setdefault(clave, []).append("%s::%s" % (ruta.name, nombre))
     return mapa
 
 
