@@ -14,3 +14,37 @@ Registra iteraciones, hipotesis de mejora y metricas recibidas del mentor.
   `"disableBypassPermissionsMode": "disable"` en `.claude/settings.json`: en este repo no se
   puede arrancar en bypass. Es el mismo descuido que en S3 (Orca arrancaba en bypass).
 - Las demas rutas de la tabla siguen en deny.
+
+## Punto 1: servidor MCP
+
+| Pieza | Que hace |
+|---|---|
+| `manejar` | Responde initialize, ping, tools/list y tools/call. Las notificaciones y las respuestas del cliente no se contestan |
+| `principal` | Transporte stdio: una linea JSON por peticion y otra por respuesta. stdout solo lleva protocolo |
+| `resultado_tests` | pytest solo dentro de tests/, con 120 s como maximo |
+| `version_plan` | Version y parametros del plan, con la `cargar_plan` del proyecto |
+| `.mcp.json` | Registra el servidor en Claude Code como `aula-contexto` |
+
+- Si el cliente pide una herramienta o argumentos que no existen: error JSON-RPC (-32602).
+  Si falla la herramienta: resultado con isError, para que el modelo lo lea y se corrija.
+- La plantilla lanzaba el servidor con `python3 -m`. Falla si el proceso no arranca en la raiz
+  (probado desde /tmp: "No module named 'agentes'") y la documentacion de Claude Code no
+  garantiza esa carpeta. Se lanza el fichero por su ruta.
+- `resultado_tests` lo puede llamar cualquier agente: sin limites serviria para ejecutar
+  cualquier cosa. Se rechazan rutas fuera de tests/, rodeos con `..`, rutas absolutas y textos
+  que empiezan por `-` (pytest los tomaria como opciones).
+
+Revision (revisor, Opus): APROBAR CON CAMBIOS. Se aplicaron:
+
+| Hallazgo | Arreglo |
+|---|---|
+| El servidor se caia con `"arguments": 5` | Se validan los tipos y el bucle tiene red de seguridad (-32603) |
+| Test de trazabilidad decorativo (solo miraba las claves) | Comprueba que CA-01 esta cubierto y que no se pierde ningun criterio |
+| Ramas sin test: fallidos, tiempo agotado, isError, ping | Tests nuevos, con pytest simulado donde hace falta |
+| Si pytest no llegaba a ejecutar (ruta inexistente) no se sabia por que | Se devuelve el motivo y el codigo |
+| Cambio de workflows mezclado con el servidor | Separado en su propio PR |
+
+El trabajo se partio en tres PRs para no pasar de 400 lineas: control de workflows,
+transporte y herramientas.
+
+Prueba en vivo desde Claude Code: (pendiente)
