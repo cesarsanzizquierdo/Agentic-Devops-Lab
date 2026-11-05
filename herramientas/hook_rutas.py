@@ -19,9 +19,10 @@ BLOQUEAR = 2
 
 # Carpetas protegidas segun la tabla de limites de CLAUDE.md.
 # "evals/dorado" no lleva barra final porque protege evals/dorado*/.
+# .github/workflows/ no esta aqui: la regla "ask" de settings.json pregunta al humano
+# antes de cada cambio. Si el hook la bloqueara, la pregunta nunca llegaria a salir.
 PREFIJOS_PROTEGIDOS = (
     "manifiestos/",
-    ".github/workflows/",
     "evals/dorado",
     "src/aula/legado/",
 )

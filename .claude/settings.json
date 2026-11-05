@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "disableBypassPermissionsMode": "disable",
     "allow": [
       "Bash(python -m pytest:*)",
       "Bash(.venv/Scripts/python.exe -m pytest:*)",
@@ -11,14 +12,14 @@
     ],
     "deny": [
       "Edit(manifiestos/**)",
-      "Edit(.github/workflows/**)",
       "Edit(labs/*/verificar.py)",
       "Edit(evals/dorado*/**)",
       "Edit(src/aula/legado/**)"
     ],
     "ask": [
       "Edit(.claude/**)",
-      "Edit(CLAUDE.md)"
+      "Edit(CLAUDE.md)",
+      "Edit(.github/workflows/**)"
     ]
   },
   "hooks": {

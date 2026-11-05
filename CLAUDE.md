@@ -71,9 +71,10 @@ Rutas que **no puedes modificar** sin aprobación humana explícita:
 | `labs/*/verificar.py` | Es la vara de medir del laboratorio |
 | `evals/dorado*/` | Es el conjunto de evaluación. Optimizar contra él en lugar de contra el problema es el fallo clásico |
 
-`.claude/` (permisos, hooks y subagentes) y este CLAUDE.md sí se pueden
-modificar, pero siempre con confirmación del humano: la regla `ask` de
-`.claude/settings.json` lo pregunta antes de cada cambio.
+Cómo se aplica la aprobación: las rutas de la tabla están bloqueadas con `deny`,
+salvo `.github/workflows/`, que lleva `ask`: el agente puede proponer el cambio y
+Claude Code pregunta al humano antes de cada edición. Lo mismo vale para `.claude/`
+(permisos, hooks y subagentes) y para este CLAUDE.md.
 
 ## Escalado
 
