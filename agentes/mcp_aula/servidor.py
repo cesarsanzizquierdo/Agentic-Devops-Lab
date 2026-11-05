@@ -212,7 +212,9 @@ def _llamar_herramienta(ident, parametros) -> dict:
     if not isinstance(parametros, dict):
         return _error(ident, ERROR_PARAMETROS_INVALIDOS, "params debe ser un objeto")
     nombre = parametros.get("name")
-    argumentos = parametros.get("arguments") or {}
+    argumentos = parametros.get("arguments")
+    if argumentos is None:
+        argumentos = {}     # una herramienta sin argumentos puede llegar sin "arguments"
     if not isinstance(nombre, str) or not isinstance(argumentos, dict):
         return _error(ident, ERROR_PARAMETROS_INVALIDOS,
                       "name debe ser texto y arguments un objeto")
@@ -280,7 +282,8 @@ def principal():
     con el cliente. La respuesta sale en ASCII (tildes escapadas como \\u00f3) para
     no depender de la codificacion de la consola, que en Windows no es UTF-8.
     """
-    # errors="replace": un byte invalido se convierte en "?" en vez de cortar el bucle.
+    # errors="replace": un byte invalido se convierte en el caracter de reemplazo (U+FFFD)
+    # en vez de cortar el bucle.
     sys.stdin.reconfigure(encoding="utf-8", errors="replace")
     for linea in sys.stdin:
         linea = linea.strip()

@@ -28,6 +28,7 @@ def llamar_herramienta(nombre, argumentos):
 def test_initialize_anuncia_que_el_servidor_tiene_herramientas():
     respuesta = manejar(peticion("initialize"))
 
+    assert respuesta["result"]["protocolVersion"] == "2024-11-05"
     assert respuesta["result"]["capabilities"] == {"tools": {}}
     assert respuesta["result"]["serverInfo"]["name"] == "aula-contexto"
 
@@ -81,6 +82,7 @@ def test_falta_un_argumento_obligatorio_da_error_32602_y_lo_nombra():
     ["obtener_spec"],                                # params no es un objeto
     {"name": ["obtener_spec"], "arguments": {}},     # name no es texto
     {"name": "obtener_spec", "arguments": 5},        # arguments no es un objeto
+    {"name": "obtener_spec", "arguments": []},       # una lista vacia tampoco lo es
 ])
 def test_parametros_con_tipos_erroneos_dan_error_32602(parametros):
     assert manejar(peticion("tools/call", parametros))["error"]["code"] == -32602
@@ -115,6 +117,8 @@ def test_proceso_stdio_contesta_cada_peticion_y_sobrevive_a_entradas_rotas(tmp_p
     proceso = subprocess.run([sys.executable, str(SERVIDOR)], input="\n".join(lineas) + "\n",
                              capture_output=True, text=True, cwd=tmp_path, timeout=60)
 
+    assert proceso.returncode == 0
+    assert proceso.stderr == ""
     respuestas = []
     for linea in proceso.stdout.splitlines():
         respuestas.append(json.loads(linea))
@@ -126,3 +130,18 @@ def test_proceso_stdio_contesta_cada_peticion_y_sobrevive_a_entradas_rotas(tmp_p
     assert respuestas[3]["error"]["code"] == -32602
     # Tras las entradas rotas el servidor sigue vivo y contesta.
     assert len(respuestas[4]["result"]["tools"]) == 5
+
+
+def test_proceso_stdio_sobrevive_a_un_fallo_inesperado():
+    # Un JSON anidado 100000 veces hace que json.loads lance RecursionError, que no es un
+    # error de JSON: solo lo para la red de seguridad de principal().
+    lineas = ["[" * 100000, json.dumps(peticion("ping"))]
+
+    proceso = subprocess.run([sys.executable, str(SERVIDOR)], input="\n".join(lineas) + "\n",
+                             capture_output=True, text=True, timeout=60)
+
+    respuestas = []
+    for linea in proceso.stdout.splitlines():
+        respuestas.append(json.loads(linea))
+    assert respuestas[0]["error"]["code"] == -32603
+    assert respuestas[1]["result"] == {}    # el ping se contesta: el proceso sigue vivo
