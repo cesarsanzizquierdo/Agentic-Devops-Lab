@@ -18,19 +18,20 @@ BLOQUEADO = 2
 
 RUTA_SETTINGS = RAIZ / ".claude" / "settings.json"
 
-# Una regla "deny" por cada fila de la tabla de limites de CLAUDE.md.
+# Una regla "deny" por cada fila de la tabla de limites de CLAUDE.md, salvo los workflows.
 REGLAS_DENY_OBLIGATORIAS = (
     "Edit(manifiestos/**)",
-    "Edit(.github/workflows/**)",
     "Edit(labs/*/verificar.py)",
     "Edit(evals/dorado*/**)",
     "Edit(src/aula/legado/**)",
 )
 
-# Las reglas con las que trabaja el agente: puede cambiarlas, pero siempre preguntando.
+# Lo que el agente puede cambiar, pero siempre preguntando al humano: sus propias reglas
+# y los workflows (los gates), que la tabla de limites deja tocar con aprobacion explicita.
 REGLAS_ASK_OBLIGATORIAS = (
     "Edit(.claude/**)",
     "Edit(CLAUDE.md)",
+    "Edit(.github/workflows/**)",
 )
 
 
@@ -65,6 +66,11 @@ def test_settings_pregunta_antes_de_cambiar_las_reglas_del_agente():
         assert regla in reglas_ask, regla
 
 
+def test_settings_prohibe_el_modo_bypass():
+    """En modo bypass no sale ninguna pregunta: las reglas "ask" dejarian de proteger."""
+    assert leer_permisos().get("disableBypassPermissionsMode") == "disable"
+
+
 def test_hook_rutas_bloquea_manifiestos_con_barras_normales():
     assert codigo_hook_rutas("manifiestos/agente.yaml") == BLOQUEADO
 
@@ -80,7 +86,6 @@ def test_hook_rutas_bloquea_ruta_absoluta_del_proyecto():
 
 def test_hook_rutas_bloquea_todas_las_rutas_de_limites():
     rutas_protegidas = [
-        ".github/workflows/ci.yml",
         "labs/S3-contexto/verificar.py",
         "evals/dorado-v1/casos.json",
         "src/aula/legado/calculo.py",
@@ -89,10 +94,11 @@ def test_hook_rutas_bloquea_todas_las_rutas_de_limites():
         assert codigo_hook_rutas(ruta) == BLOQUEADO, ruta
 
 
-def test_hook_rutas_deja_pasar_las_reglas_del_agente_porque_se_preguntan():
-    # .claude/ y CLAUDE.md no se bloquean: la regla "ask" de settings.json pide confirmacion.
+def test_hook_rutas_deja_pasar_lo_que_se_pregunta():
+    # No se bloquean: la regla "ask" de settings.json pide confirmacion al humano.
     assert codigo_hook_rutas(".claude/agents/revisor.md") == PERMITIDO
     assert codigo_hook_rutas("CLAUDE.md") == PERMITIDO
+    assert codigo_hook_rutas(".github/workflows/ci.yml") == PERMITIDO
 
 
 def test_hook_rutas_no_se_engana_con_rodeos():
