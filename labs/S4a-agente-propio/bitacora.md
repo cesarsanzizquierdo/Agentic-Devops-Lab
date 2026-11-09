@@ -167,3 +167,20 @@ Limites conocidos:
   comenta que el PR no declara spec y como declararla.
 - `conformidad_pr.py` no encontraba el paquete `agentes` al lanzarse como
   `python herramientas/conformidad_pr.py`: se anade la raiz del repositorio al path.
+
+Revision (revisor, Opus): APROBAR CON CAMBIOS. Se aplicaron:
+
+| Hallazgo | Arreglo |
+|---|---|
+| Un fallo del script salia con 1, el mismo codigo que "no conforme" | Sale con 3 y no escribe comentario; el job falla en rojo |
+| El agente solo recibia los `.py` y `.md` | Recibe todas las rutas, asi un `.yml` tambien cuenta para el alcance |
+| `archivos()` no tenia test | Test con un repositorio git temporal que anade, cambia y borra ficheros |
+| Endurecimiento | `persist-credentials: false`, `concurrency` y no se ejecuta en PRs desde forks |
+
+Limites conocidos:
+
+- El PR se juzga con su propio codigo: GitHub ejecuta el agente, `conformidad_pr.py` y las specs
+  de la rama del PR. Un PR que modifique el agente o la spec puede salir "conforme". Mientras solo
+  informa es aceptable; para usarlo como gate en S6 habra que ejecutar el agente desde la base.
+- La decision de cobertura (ficheros completos) ahora es publica: si un PR toca una linea de un
+  fichero de tests, el comentario puede dar por cubierto un criterio por un test que ya existia.

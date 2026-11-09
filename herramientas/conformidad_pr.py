@@ -7,7 +7,7 @@ El PR declara en su descripcion que spec implementa:
 El script saca del diff los ficheros que cambian, se los pasa al agente y escribe el
 veredicto en Markdown. El workflow .github/workflows/conformidad.yml lo publica en el PR.
 
-Codigos de salida: 0 conforme, 1 no conforme, 2 el PR no declara spec.
+Codigos de salida: 0 conforme, 1 no conforme, 2 el PR no declara spec, 3 fallo.
 """
 from __future__ import annotations
 
@@ -51,14 +51,23 @@ def metadatos(cuerpo: str) -> tuple[str, list[str]]:
 
 
 def archivos(base: str) -> list[dict]:
+    """Ficheros que cambia el PR. Se leen los .py y .md; del resto basta la ruta.
+
+    El agente necesita todas las rutas para la regla de alcance: un PR de spec que toque un
+    .yml de .github/workflows/ tambien sale fuera de alcance. Los borrados no se incluyen.
+    """
     rutas = subprocess.check_output(
         ["git", "diff", "--name-only", f"{base}...HEAD"], cwd=RAIZ, text=True
     ).splitlines()
     salida = []
     for ruta in rutas:
         fichero = RAIZ / ruta
-        if fichero.is_file() and fichero.suffix in {".py", ".md"}:
-            salida.append({"ruta": ruta, "contenido": fichero.read_text(encoding="utf-8")})
+        if not fichero.is_file():
+            continue
+        contenido = ""
+        if fichero.suffix in {".py", ".md"}:
+            contenido = fichero.read_text(encoding="utf-8")
+        salida.append({"ruta": ruta, "contenido": contenido})
     return salida
 
 
@@ -97,6 +106,11 @@ def comentario(veredicto: dict) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Devuelve 0 conforme, 1 no conforme, 2 sin spec y 3 si algo falla.
+
+    Un fallo inesperado (git, un fichero ilegible, un error del agente) sale con 3 y no
+    escribe comentario: si saliera con 1 pareceria un veredicto "no conforme".
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", required=True)
     parser.add_argument("--cuerpo", required=True)
@@ -104,8 +118,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--comentario", default=".conformidad-pr.md")
     args = parser.parse_args(argv)
     try:
-        spec, criterios = metadatos(Path(args.cuerpo).read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
+        return evaluar_pr(args)
+    except Exception as fallo:
+        print(f"FALLO: {type(fallo).__name__}: {fallo}", file=sys.stderr)
+        return 3
+
+
+def evaluar_pr(args) -> int:
+    cuerpo = Path(args.cuerpo).read_text(encoding="utf-8")
+    try:
+        spec, criterios = metadatos(cuerpo)
+    except ValueError as exc:
         print(f"ERROR: {exc}")
         Path(args.comentario).write_text(SIN_SPEC.format(motivo=exc), encoding="utf-8")
         return 2

@@ -13,15 +13,23 @@ permissions:
   contents: read
   pull-requests: write
 
+# Dos ejecuciones seguidas del mismo PR (editar la descripcion y hacer push) no se pisan.
+concurrency:
+  group: conformidad-${{ github.event.pull_request.number }}
+
 jobs:
   veredicto:
     name: Veredicto del agente de conformidad
     runs-on: ubuntu-latest
+    # Desde un fork el token es de solo lectura y no podria comentar.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Checkout del codigo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # El codigo del PR se ejecuta en el paso siguiente: que no encuentre el token en .git/config.
+          persist-credentials: false
 
       - name: Configurar Python
         uses: actions/setup-python@v5
@@ -39,8 +47,12 @@ jobs:
           python herramientas/conformidad_pr.py --base origin/main --cuerpo cuerpo-pr.md --comentario comentario.md
           codigo=$?
           set -e
-          # 0 conforme, 1 no conforme, 2 sin spec: los tres se publican. Otro codigo es un fallo.
-          if [ "$codigo" -gt 2 ]; then exit "$codigo"; fi
+          # 0 conforme, 1 no conforme, 2 sin spec: los tres se publican. 3 es un fallo del
+          # script y el job falla en rojo, sin publicar nada que parezca un veredicto.
+          if [ "$codigo" -gt 2 ] || [ ! -s comentario.md ]; then
+            echo "El agente no pudo emitir veredicto (codigo $codigo)"
+            exit 1
+          fi
 
       - name: Publicar el veredicto en el PR
         env:
