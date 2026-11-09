@@ -155,3 +155,15 @@ Limites conocidos:
 - `float` se detecta por texto: `float(` si, pero no `7.5 / 2` ni `round(`. El redondeo unico
   (invariante 1) no se comprueba.
 - El conjunto de evaluacion no se sube al repo, asi que S4a-04 solo se puede comprobar en local.
+
+## Entregable: el agente publica sus veredictos en PRs reales
+
+- `.github/workflows/conformidad.yml`: en cada PR a main ejecuta `herramientas/conformidad_pr.py`,
+  que lee la spec declarada en la descripcion, pasa al agente los ficheros del diff y publica el
+  veredicto como comentario. Si el PR se actualiza, edita el mismo comentario.
+- No usa ningun modelo ni credenciales externas: corre en GitHub Actions con el token del propio
+  repositorio. Informa; no bloquea el merge (convertirlo en gate es trabajo de S6).
+- La plantilla de PR incluye `AULA_SPEC_ID` y `AULA_CRITERIOS`. Si no se rellenan, el agente
+  comenta que el PR no declara spec y como declararla.
+- `conformidad_pr.py` no encontraba el paquete `agentes` al lanzarse como
+  `python herramientas/conformidad_pr.py`: se anade la raiz del repositorio al path.
