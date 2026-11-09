@@ -1,3 +1,8 @@
+## Spec que implementa
+<!-- Si el PR implementa una spec, cambia las dos lineas; el agente de conformidad las lee y comenta su veredicto. Si no, borralas. -->
+AULA_SPEC_ID: SPEC-0XX
+AULA_CRITERIOS: CA-0X
+
 ## Checklist de revision
 - [ ] 1. ¿Cada criterio de aceptacion tocado tiene test que lo referencia?
 - [ ] 2. ¿Los tests fallan si rompo la implementacion a proposito?

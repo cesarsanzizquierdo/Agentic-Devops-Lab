@@ -1,0 +1,64 @@
+name: Conformidad de spec
+
+# En cada PR a main, el agente de conformidad (agentes/conformidad/agente.py) revisa el PR
+# contra la spec que declara y publica su veredicto como comentario. No usa ningun modelo:
+# son reglas fijas en Python. Informa, pero no bloquea el merge.
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, edited, synchronize, reopened ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# Dos ejecuciones seguidas del mismo PR (editar la descripcion y hacer push) no se pisan.
+concurrency:
+  group: conformidad-${{ github.event.pull_request.number }}
+
+jobs:
+  veredicto:
+    name: Veredicto del agente de conformidad
+    runs-on: ubuntu-latest
+    # Desde un fork el token es de solo lectura y no podria comentar.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Checkout del codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # El codigo del PR se ejecuta en el paso siguiente: que no encuentre el token en .git/config.
+          persist-credentials: false
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Ejecutar el agente
+        env:
+          # El cuerpo del PR pasa por una variable de entorno y no pegado en el script:
+          # asi un texto malicioso en la descripcion no se ejecuta como comando.
+          CUERPO_PR: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "$CUERPO_PR" > cuerpo-pr.md
+          set +e
+          python herramientas/conformidad_pr.py --base origin/main --cuerpo cuerpo-pr.md --comentario comentario.md
+          codigo=$?
+          set -e
+          # 0 conforme, 1 no conforme, 2 sin spec: los tres se publican. 3 es un fallo del
+          # script y el job falla en rojo, sin publicar nada que parezca un veredicto.
+          if [ "$codigo" -gt 2 ] || [ ! -s comentario.md ]; then
+            echo "El agente no pudo emitir veredicto (codigo $codigo)"
+            exit 1
+          fi
+
+      - name: Publicar el veredicto en el PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMERO_PR: ${{ github.event.pull_request.number }}
+        run: |
+          # Edita el comentario anterior del bot para no llenar el PR de comentarios.
+          gh pr comment "$NUMERO_PR" --edit-last --body-file comentario.md \
+            || gh pr comment "$NUMERO_PR" --body-file comentario.md

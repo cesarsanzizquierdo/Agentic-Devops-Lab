@@ -10,3 +10,6 @@ datos/expedientes_sinteticos.json
 
 # Conjunto de evaluacion del mentor: no se sube al repositorio (README, "Evaluacion del agente").
 evals/dorado*/
+
+# Ficheros que genera herramientas/conformidad_pr.py en local.
+.conformidad-pr.*
