@@ -127,7 +127,13 @@ def test_spec002_ca04_punto_medio_half_up():
 
 
 def test_spec002_ca06_calculo_progreso():
-    """cubre: SPEC-002/CA-06. Porcentaje de creditos superados sobre el total del titulo."""
+    """cubre: SPEC-002/CA-06. Porcentaje de creditos superados sobre el total del titulo.
+
+    MAT101 aprobada (6 creditos) y PRG101 convalidada (9): 15 de los 192 del titulo.
+    15 * 100 / 192 = 7.8125, que con dos decimales es 7.81. El valor esperado va escrito
+    a mano: si se calculara con creditos_superados, un fallo en esa funcion lo tendrian
+    a la vez el codigo y el test, y el test seguiria en verde.
+    """
     plan = obtener_plan_pruebas()
     registros = [
         crear_registro("MAT101", 1, "aprobada", "7.00"),
@@ -135,11 +141,7 @@ def test_spec002_ca06_calculo_progreso():
     ]
     expediente = Expediente("EST-06", plan.codigo, registros)
 
-    creditos_obtenidos = Decimal(creditos_superados(expediente, plan))
-    esperado = ((creditos_obtenidos * Decimal("100")) / Decimal(plan.creditos_titulo)).quantize(
-        Decimal("0.01")
-    )
-    assert progreso(expediente, plan) == esperado
+    assert progreso(expediente, plan) == Decimal("7.81")
 
 
 def test_spec002_ca07_expediente_vacio_y_todo_convalidado():
