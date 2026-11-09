@@ -101,3 +101,57 @@ peor posible: da sensacion de control y no para casi nada.
 Por que, segun su codigo: el v0 dice "conforme" si algun fichero de
 tests/ menciona el identificador de la spec. No comprueba que criterio cubre cada test, que
 ficheros se tocan fuera del alcance ni si los tests comprueban algo de verdad.
+
+## Punto 2: agente de conformidad v1
+
+El agente recibe un PR (sus ficheros y los criterios que declara) y la spec que dice
+implementar, y devuelve un veredicto estructurado: conforme o no_conforme, con criterios
+cubiertos, criterios sin cubrir, ficheros fuera de alcance, hallazgos y una explicacion.
+
+- La spec se la pide al servidor MCP (`obtener_spec`), que ahora devuelve tambien sus rutas.
+- El veredicto es determinista: lo deciden reglas fijas, no un modelo. El mismo PR da siempre
+  el mismo veredicto, que es lo que necesita un gate (PLAYBOOK, S4a).
+- Solo usa lo que tiene un PR real ("ficheros" y "criterios_declarados"). Un test comprueba que
+  el veredicto no cambia si el caso trae `etiqueta` o `titulo`.
+- Para conocer el formato de los casos de evaluacion se consultaron `oro-001` y `oro-005`.
+
+Decision del humano sobre la cobertura: un criterio esta cubierto si algun `tests/test_*.py`
+que toca el PR tiene un test con `cubre: SPEC/CA` en su docstring (opcion 1 de tres). Limite
+conocido: si el PR toca una linea de un fichero de tests, cuentan tambien las etiquetas que ya
+habia en el. Se revisara al conectar el agente a PRs reales, que es donde se construye la entrada.
+
+## Puntos 4 y 5: iteraciones y que cambio entre v0 y v1
+
+| Version | Precision | Recall | Matriz | Informe |
+|---|---|---|---|---|
+| v0 (semilla) | 1,00 | 0,10 | vp 1, fp 0, vn 5, fn 9 | `evaluacion_v0.json` |
+| v1, primera medicion | 0,91 | 1,00 | vp 10, fp 1, vn 4, fn 0 | sin guardar |
+| v1 tras la revision | 1,00 | 1,00 | vp 10, fp 0, vn 5, fn 0 | `evaluacion_v1.json` |
+
+Que cambio y por que mejoro:
+
+| v0 | v1 | Efecto |
+|---|---|---|
+| "Conforme" si algun test menciona el id de la spec | Cada criterio declarado necesita su propio test con `cubre:` en el docstring | Es lo que mas sube el recall: un PR con tests de otro criterio, o que declara dos criterios y prueba uno, ya no pasa |
+| No mira que ficheros se tocan | Cada fichero del PR debe estar en las rutas de la spec | Detecta PRs que tocan codigo de otra spec |
+| Cualquier test vale | Un test con skip/xfail, sin asercion o con una asercion que siempre se cumple es un hallazgo | Detecta tests decorativos (checklist, punto 3) |
+| No mira el codigo | `float(` en `src/` es un hallazgo (invariante 2) | Detecta calculos con coma flotante |
+
+De la primera medicion a la version final, el revisor (Opus) encontro dos fallos de las reglas:
+
+- `assert f(e) == f(e)` se tomaba por asercion vacia, cuando es como se prueba que algo es
+  determinista. Ahora solo es vacia si compara constantes (`1 + 1 == 2`) o la misma variable.
+- Un `cubre:` en `tests/conftest.py` contaba como evidencia, aunque pytest no lo ejecuta como
+  test. Ahora solo cuentan los `tests/test_*.py`, igual que en la trazabilidad.
+
+Ademas, la lectura de `cubre:` paso a hacerse con `ast`. Tras estas correcciones desaparece la
+falsa alarma de la primera medicion.
+
+Limites conocidos:
+
+- 15 casos son pocos: un caso nuevo mal clasificado bajaria la precision a 0,91.
+- La regla de alcance es estricta: un PR de spec que toque tambien la bitacora o cree un fichero
+  de tests nuevo sale no conforme, porque esas rutas no estan en la linea `Rutas:` de la spec.
+- `float` se detecta por texto: `float(` si, pero no `7.5 / 2` ni `round(`. El redondeo unico
+  (invariante 1) no se comprueba.
+- El conjunto de evaluacion no se sube al repo, asi que S4a-04 solo se puede comprobar en local.
