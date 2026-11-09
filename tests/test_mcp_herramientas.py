@@ -33,6 +33,12 @@ def test_obtener_spec_devuelve_sus_criterios():
     assert "CA-08" in datos["criterios"]
 
 
+def test_obtener_spec_devuelve_las_rutas_de_su_alcance():
+    datos = datos_de(llamar_herramienta("obtener_spec", {"id": "SPEC-001"}))
+    assert datos["rutas"] == ["src/aula/reglas/motor.py", "src/aula/dominio/",
+                              "tests/test_reglas_matricula.py", "specs/SPEC-001-matricula.md"]
+
+
 def test_trazabilidad_pone_cada_criterio_en_cubiertos_o_en_sin_cubrir():
     datos = datos_de(llamar_herramienta("trazabilidad", {"spec_id": "SPEC-002"}))
     criterios = datos_de(llamar_herramienta("obtener_spec", {"id": "SPEC-002"}))["criterios"]
