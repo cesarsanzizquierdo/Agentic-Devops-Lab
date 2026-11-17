@@ -1,0 +1,92 @@
+{
+  "version": "1.0.0",
+  "descripcion": "Contrato de contexto de la flotilla de Aula: que ve cada agente, que escribe, que se pasan y que pasa cuando dos quieren tocar el mismo fichero.",
+  "contexto_compartido": {
+    "servidor_mcp": "agentes/mcp_aula/servidor.py",
+    "revision": "Los tres agentes leen el mismo commit con el mismo escenario aplicado: un parche que el coordinador aplica sin hacer commit.",
+    "aislamiento": "Cada agente se ejecuta en su propio worktree (git worktree add --detach, en ~/aula-flotilla/<agente>) y en su propio proceso, con su propia instancia del servidor MCP.",
+    "acceso_al_servidor": "Triaje y modernizacion piden las herramientas a traves de agentes/flotilla/mcp.py, que rechaza las que su contrato no declara.",
+    "rutas": "Las rutas de propone_tocar son relativas a la raiz del repositorio y usan /."
+  },
+  "agentes": [
+    {
+      "id": "conformidad-spec",
+      "modulo": "agentes/conformidad/agente.py",
+      "proposito": "Decide si un cambio cumple la spec que declara implementar.",
+      "invocacion": "python -m agentes.conformidad.agente --pr FICHERO --spec SPEC-nnn --json",
+      "herramientas_mcp": ["obtener_spec"],
+      "entradas": {
+        "pr": "JSON con los ficheros del cambio (ruta y contenido) y los criterios que declara; lo prepara el coordinador",
+        "spec": "la spec que declara el escenario"
+      },
+      "salida": ["veredicto", "spec", "criterios_sin_cubrir", "fuera_de_alcance", "hallazgos", "explicacion"],
+      "codigos_salida": {"0": "conforme", "1": "no_conforme"},
+      "escribe": []
+    },
+    {
+      "id": "triaje-pipeline",
+      "modulo": "agentes/triaje/agente.py",
+      "proposito": "Ejecuta los tests, clasifica cada fallo y senala su criterio y los ficheros sospechosos. Solo propone tocar codigo en las regresiones, y nunca un test.",
+      "invocacion": "python -m agentes.triaje.agente [--ruta tests/] [--cambiados RUTA ...]",
+      "herramientas_mcp": ["resultado_tests", "trazabilidad", "listar_specs", "obtener_spec"],
+      "entradas": {
+        "ruta": "tests que ejecutar, dentro de tests/ (por defecto tests/)",
+        "cambiados": "ficheros que cambia el escenario, para acotar los sospechosos"
+      },
+      "salida": ["agente", "raiz", "estado", "resumen", "fallos", "propone_tocar"],
+      "codigos_salida": {"0": "verde", "1": "rojo", "2": "no_ejecutado"},
+      "escribe": []
+    },
+    {
+      "id": "modernizacion-legado",
+      "modulo": "agentes/modernizacion/agente.py",
+      "proposito": "Propone como modernizar un modulo: hallazgos y pasos en orden fijo. Si hay legado sin caracterizar, caracterizarlo va antes que cualquier cambio de codigo.",
+      "invocacion": "python -m agentes.modernizacion.agente [--plan PLAN-2024] RUTA [RUTA ...]",
+      "herramientas_mcp": ["version_plan"],
+      "entradas": {
+        "modulos": "ficheros .py que analizar: el legado y el codigo de src/ que cambia el escenario",
+        "plan": "plan vigente con el que comparar las constantes (por defecto PLAN-2024)"
+      },
+      "salida": ["agente", "raiz", "modulos", "hallazgos", "pasos", "propone_tocar"],
+      "codigos_salida": {"0": "propuesta emitida"},
+      "escribe": []
+    }
+  ],
+  "coordinador": {
+    "modulo": "agentes/flotilla/coordinador.py",
+    "hace": "Prepara los worktrees, lanza los tres agentes a la vez, valida cada salida con este contrato, aplica los handoffs y la regla de conflicto, y graba el ciclo.",
+    "escribe": ["labs/S4b-flotilla/ciclo/"]
+  },
+  "handoff": [
+    {
+      "de": "conformidad-spec",
+      "a": "humano",
+      "cuando": "siempre",
+      "campos": ["spec", "veredicto", "criterios_sin_cubrir", "fuera_de_alcance"],
+      "que_pasa": "El veredicto, para decidir el merge."
+    },
+    {
+      "de": "triaje-pipeline",
+      "a": "humano",
+      "cuando": {"campo": "estado", "valores": ["rojo", "no_ejecutado"]},
+      "campos": ["estado", "resumen", "fallos", "propone_tocar"],
+      "que_pasa": "La incidencia: cada fallo con su categoria, su criterio y los ficheros que hay que mirar."
+    },
+    {
+      "de": "modernizacion-legado",
+      "a": "humano",
+      "cuando": "siempre",
+      "campos": ["hallazgos", "pasos", "propone_tocar"],
+      "que_pasa": "La propuesta por pasos. Ningun paso se aplica sin aprobacion humana."
+    }
+  ],
+  "conflicto": {
+    "cuando": "Dos agentes incluyen el mismo fichero en propone_tocar. Conformidad no propone cambios, asi que no entra en conflicto.",
+    "deteccion": "El coordinador cruza los propone_tocar de las salidas del ciclo.",
+    "prioridad": ["triaje-pipeline", "modernizacion-legado"],
+    "regla": "Gana el de mas prioridad, porque primero hay que devolver el verde. Del otro solo se pospone la propuesta sobre ese fichero; el resto de su propuesta sigue adelante. La decision queda en la grabacion del ciclo.",
+    "escalado": "Ningun agente aplica nada: todo llega al humano como propuesta. Si una propuesta toca una ruta protegida de CLAUDE.md (por ejemplo src/aula/legado/) o hay una duda que la prioridad no resuelve, decide el humano.",
+    "en_git": "Los agentes no crean ramas ni commits. Si el humano convierte dos propuestas en PRs, mergea primero la del agente con mas prioridad y la otra se rehace sobre main."
+  },
+  "si_falla_un_agente": "Si un agente no acaba en 600 s, sale con un codigo que no declara, no devuelve JSON o le falta un campo de su salida, el ciclo se graba como incompleto y no se decide ningun conflicto. Lo mismo si triaje no llega a ejecutar los tests."
+}
