@@ -230,10 +230,13 @@ def resultado_tests(args: dict) -> dict:
     if not ruta_de_tests_permitida(ruta):
         return {"error": "ruta no permitida: %s. Solo se aceptan rutas dentro de tests/" % ruta}
 
+    # --continue-on-collection-errors: un fichero de tests roto no esconde el resultado del resto.
     comando = [sys.executable, "-m", "pytest", ruta, "-q", "-rfE", "--no-header",
-               "-p", "no:cacheprovider"]
+               "-p", "no:cacheprovider", "--continue-on-collection-errors"]
     # La salida de pytest se captura: stdout es del protocolo y no puede llevar nada mas.
-    entorno = dict(os.environ, PYTHONIOENCODING="utf-8")
+    # COLUMNS ancho: con la salida capturada, pytest supone 80 columnas y quita el motivo de cada
+    # fallo ("FAILED test - AssertionError: ...") cuando el nombre del test es largo.
+    entorno = dict(os.environ, PYTHONIOENCODING="utf-8", COLUMNS="1000")
     try:
         # stdin=DEVNULL: pytest no hereda el canal por el que llegan los mensajes MCP.
         proceso = subprocess.run(comando, cwd=RAIZ, capture_output=True, env=entorno,
