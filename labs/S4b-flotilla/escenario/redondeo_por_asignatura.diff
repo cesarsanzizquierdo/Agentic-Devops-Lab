@@ -1,0 +1,14 @@
+diff --git a/src/aula/reglas/media.py b/src/aula/reglas/media.py
+index 7a72716..f34b8e4 100644
+--- a/src/aula/reglas/media.py
++++ b/src/aula/reglas/media.py
+@@ -53,7 +53,8 @@ def nota_media_ponderada(expediente: Expediente, plan: Plan) -> Decimal:
+ 
+         asignatura_plan = plan.asignatura(codigo)
+         creditos_asignatura = Decimal(asignatura_plan.creditos)
+-        nota_asignatura = convertir_a_decimal(ultimo_aprobado.nota)
++        nota_asignatura = convertir_a_decimal(ultimo_aprobado.nota).quantize(
++            Decimal("0.1"), rounding=ROUND_HALF_UP)
+ 
+         # INV-01: Acumulamos sin redondear valores intermedios
+         puntos_asignatura = nota_asignatura * creditos_asignatura
