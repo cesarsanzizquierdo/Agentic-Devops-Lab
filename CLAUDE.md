@@ -58,6 +58,8 @@ escribir nada.
 - Español en documentación y en nombres de dominio. Inglés solo donde lo imponga
   una biblioteca.
 - Sin dependencias nuevas sin justificarlas en el PR.
+- Todo código generado debe ser legible (no anidar multiples funciones en 1 o 2 lineas)
+- Estructuras claras y nombres de variables legibles (nada de x for i in z...)
 
 ## Límites
 

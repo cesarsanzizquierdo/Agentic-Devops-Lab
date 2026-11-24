@@ -1,18 +1,12 @@
 # Bitacora de S4a
 
-Registra iteraciones, hipotesis de mejora y metricas recibidas del mentor.
 
 ## Cambio de control: .github/workflows/ pasa de deny a ask
 
 - Motivo: la tabla de limites de CLAUDE.md pide aprobacion humana explicita, no prohibicion.
-  Con deny, los workflows de S4a (veredictos en PRs) y de S6 (gates) tendria que escribirlos
-  el humano a mano. Lo decidio el humano.
-- Ahora el agente propone el cambio y Claude Code pregunta antes de cada edicion. El hook ya
-  no bloquea esa ruta: si lo hiciera, la pregunta nunca saldria.
-- Riesgo detectado por el revisor: en modo bypass Claude Code no pregunta nada (lo dice su
-  documentacion), asi que ask dejaria de proteger. Se cierra con
-  `"disableBypassPermissionsMode": "disable"` en `.claude/settings.json`: en este repo no se
-  puede arrancar en bypass. Es el mismo descuido que en S3 (Orca arrancaba en bypass).
+- Ahora el agente propone el cambio y Claude Code pregunta antes de cada edicion. El hook ya no bloquea esa ruta: si lo hiciera, la pregunta nunca saldria.
+- Riesgo detectado por el revisor: en modo bypass Claude Code no pregunta nada (lo dice su documentacion), asi que ask dejaria de proteger. Se cierra con
+  `"disableBypassPermissionsMode": "disable"` en `.claude/settings.json`: en este repo no se puede arrancar en bypass. Es el mismo descuido que en S3 (Orca arrancaba en bypass).
 - Las demas rutas de la tabla siguen en deny.
 
 ## Punto 1: servidor MCP
@@ -98,7 +92,7 @@ linea base es la de partida. Informe: `evals/informes/evaluacion_v0.json`.
 Lectura: cuando acusa acierta, pero deja pasar 9 de los 10 PRs no conformes. Como gate es lo
 peor posible: da sensacion de control y no para casi nada.
 
-Por que, segun su codigo: el v0 dice "conforme" si algun fichero de
+Por que el v0 dice "conforme" si algun fichero de
 tests/ menciona el identificador de la spec. No comprueba que criterio cubre cada test, que
 ficheros se tocan fuera del alcance ni si los tests comprueban algo de verdad.
 
@@ -107,6 +101,8 @@ ficheros se tocan fuera del alcance ni si los tests comprueban algo de verdad.
 El agente recibe un PR (sus ficheros y los criterios que declara) y la spec que dice
 implementar, y devuelve un veredicto estructurado: conforme o no_conforme, con criterios
 cubiertos, criterios sin cubrir, ficheros fuera de alcance, hallazgos y una explicacion.
+
+ Informe: `evals/informes/evaluacion_v1.json`
 
 - La spec se la pide al servidor MCP (`obtener_spec`), que ahora devuelve tambien sus rutas.
 - El veredicto es determinista: lo deciden reglas fijas, no un modelo. El mismo PR da siempre
@@ -184,3 +180,20 @@ Limites conocidos:
   informa es aceptable; para usarlo como gate en S6 habra que ejecutar el agente desde la base.
 - La decision de cobertura (ficheros completos) ahora es publica: si un PR toca una linea de un
   fichero de tests, el comentario puede dar por cubierto un criterio por un test que ya existia.
+
+### Prueba en PRs reales
+
+| PR | Que declara | Commit | Veredicto publicado |
+|---|---|---|---|
+| #18, el propio workflow | Nada: es un PR de herramientas | `15a085d` | "sin spec declarada", con las dos lineas para declararla |
+| #19, test de progreso de CA-06 | `SPEC-002` / `CA-06` | `13522e2`: el test con `@pytest.mark.skip`, temporal y a proposito | no conforme: "test_spec002_ca06_calculo_progreso esta marcado para no ejecutarse" |
+| #19 | `SPEC-002` / `CA-06` | `7919de9`: valor esperado fijo y sin la omision | conforme, en el mismo comentario editado; la version anterior queda en su historial ("edited") |
+
+Lo que muestra el #19: con el primer commit, los 5 checks del CI estaban en verde (pytest da por
+bueno un test omitido) y solo el agente detecto que CA-06 no se estaba comprobando.
+
+El PR tambien corrige el propio test. Calculaba el valor esperado con `creditos_superados`, la
+misma funcion que usa `progreso`, asi que un fallo en ella pasaba en verde. Con una mutacion de
+prueba (condicion invertida: solo cuentan las convalidadas), el test anterior pasa y el nuevo falla
+con `4.69 != 7.81`. Ademas, el anterior redondeaba con la regla por defecto de `Decimal` (mitad al
+par) y el codigo con mitad hacia arriba: con un 3.125 habrian discrepado por el redondeo.
