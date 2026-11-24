@@ -1,11 +1,17 @@
 """Tests del contrato de contexto de la flotilla (agentes/flotilla/contrato.json y contrato.py)."""
+import ast
 import copy
+from pathlib import Path
 
 import pytest
 
-from agentes.flotilla.contrato import buscar_agente, cargar, principal, validar_contrato, validar_salida
+from agentes.flotilla.contrato import (buscar_agente, cargar, nombres_de_herramientas, principal,
+                                       validar_contrato, validar_salida)
 
+RAIZ = Path(__file__).resolve().parents[1]
 CONTRATO = cargar()
+# Llamadas con las que un agente escribiria o borraria ficheros.
+ESCRITURAS = ["open", "write_text", "write_bytes", "mkdir", "unlink", "remove", "rmtree", "rename"]
 
 
 def con_cambio(cambiar) -> dict:
@@ -103,3 +109,28 @@ def test_una_salida_incompleta_se_rechaza(salida, error_esperado):
 def test_la_linea_de_comandos_valida_el_contrato_real(capsys):
     assert principal() == 0
     assert "OK: contrato valido, 3 agentes" in capsys.readouterr().out
+
+
+def lo_que_usa_el_codigo(modulo: str) -> tuple:
+    """(herramientas MCP que nombra el codigo, funciones a las que llama)."""
+    arbol = ast.parse((RAIZ / modulo).read_text(encoding="utf-8"))
+    herramientas = []
+    llamadas = []
+    for nodo in ast.walk(arbol):
+        if isinstance(nodo, ast.Constant) and nodo.value in nombres_de_herramientas():
+            herramientas.append(nodo.value)
+        if isinstance(nodo, ast.Call) and isinstance(nodo.func, ast.Attribute):
+            llamadas.append(nodo.func.attr)
+        if isinstance(nodo, ast.Call) and isinstance(nodo.func, ast.Name):
+            llamadas.append(nodo.func.id)
+    return sorted(set(herramientas)), llamadas
+
+
+@pytest.mark.parametrize("declarado", CONTRATO["agentes"], ids=lambda declarado: declarado["id"])
+def test_el_codigo_de_cada_agente_cumple_lo_que_declara(declarado):
+    """Declararlo no basta: el codigo usa justo sus herramientas MCP y no escribe ficheros."""
+    herramientas, llamadas = lo_que_usa_el_codigo(declarado["modulo"])
+
+    assert herramientas == sorted(declarado["herramientas_mcp"])
+    for escritura in ESCRITURAS:
+        assert escritura not in llamadas
