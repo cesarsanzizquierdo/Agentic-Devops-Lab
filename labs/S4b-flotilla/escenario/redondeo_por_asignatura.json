@@ -1,0 +1,7 @@
+{
+  "id": "redondeo-por-asignatura",
+  "descripcion": "Un PR redondea la nota de cada asignatura a un decimal antes de ponderarla. Rompe el invariante 1 de CLAUDE.md: el redondeo se aplica una sola vez y al final.",
+  "parche": "redondeo_por_asignatura.diff",
+  "spec": "SPEC-002",
+  "criterios": ["CA-04"]
+}
