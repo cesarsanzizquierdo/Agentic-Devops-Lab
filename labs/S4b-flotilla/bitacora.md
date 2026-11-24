@@ -47,29 +47,35 @@ En solitario, por instruccion del tutor: la escuadra no participo en la construc
 
 La explicacion completa esta en `labs/S4b-flotilla/flotilla.md`.
 
-```mermaid
-flowchart TB
-    coordinador["coordinador: un worktree por agente, misma revision y mismo escenario"]
-    mcp[("servidor MCP")]
-    decidir{"coordinador: valida las salidas con el contrato y cruza las propuestas"}
-    humano(["humano"])
-    grabacion[("labs/S4b-flotilla/ciclo/")]
-
-    subgraph paralelo["a la vez, cada uno en su worktree"]
-        conformidad["conformidad-spec"]
-        triaje["triaje-pipeline"]
-        modernizacion["modernizacion-legado"]
-    end
-
-    coordinador --> conformidad & triaje & modernizacion
-    conformidad -- "obtener_spec" --> mcp
-    triaje -- "resultado_tests, trazabilidad, listar_specs, obtener_spec" --> mcp
-    modernizacion -- "version_plan" --> mcp
-    conformidad -- "veredicto" --> decidir
-    triaje -- "fallos y propone_tocar" --> decidir
-    modernizacion -- "pasos y propone_tocar" --> decidir
-    decidir -- "handoffs y conflicto (gana triaje)" --> humano
-    decidir -- "el unico que escribe" --> grabacion
+```text
+  Revision del ciclo: un commit + el escenario (un parche, sin commit)
+       |
+       v
+  COORDINADOR: un worktree por agente en ~/aula-flotilla/, todos en esa revision
+       |
+       |  los tres a la vez, cada uno en su worktree y en su proceso
+       |
+       +--> conformidad-spec       recibe: los ficheros del cambio y su spec
+       |                           MCP:    obtener_spec
+       |                           da:     veredicto
+       |
+       +--> triaje-pipeline        recibe: los ficheros cambiados
+       |                           MCP:    resultado_tests, trazabilidad,
+       |                                   listar_specs, obtener_spec
+       |                           da:     estado, fallos y propone_tocar
+       |
+       +--> modernizacion-legado   recibe: el legado y el src/ que cambia
+       |                           MCP:    version_plan
+       |                           da:     hallazgos, pasos y propone_tocar
+       |
+       |  cuando acaban los tres
+       v
+  COORDINADOR: valida cada salida con el contrato y cruza los propone_tocar
+       |
+       +--> HUMANO: los handoffs y el conflicto decidido
+       |            (media.py: gana triaje; se pospone la propuesta de modernizacion)
+       |
+       +--> labs/S4b-flotilla/ciclo/: la grabacion, lo unico que se escribe
 ```
 
 ## Ciclo grabado
