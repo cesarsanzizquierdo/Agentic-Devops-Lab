@@ -150,6 +150,21 @@ def test_resultado_tests_no_comparte_la_entrada_del_servidor_con_pytest(monkeypa
     assert recibidas["stdin"] is subprocess.DEVNULL
 
 
+def test_resultado_tests_pide_a_pytest_el_motivo_entero_y_que_siga_tras_un_fichero_roto(monkeypatch):
+    recibidas = {}
+
+    def ejecutar(comando, **opciones):
+        recibidas["comando"] = comando
+        recibidas["entorno"] = opciones["env"]
+        return subprocess.CompletedProcess(comando, 0, stdout="1 passed in 0.01s", stderr="")
+    monkeypatch.setattr(servidor.subprocess, "run", ejecutar)
+
+    resultado_tests({"ruta": "tests/"})
+
+    assert recibidas["entorno"]["COLUMNS"] == "1000"     # sin recortar "- AssertionError: ..."
+    assert "--continue-on-collection-errors" in recibidas["comando"]
+
+
 def test_resultado_tests_lista_los_tests_que_fallan(monkeypatch):
     salida = ("F.\n"
               "FAILED tests/test_x.py::test_a - assert 1 == 2\n"
