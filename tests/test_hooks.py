@@ -19,12 +19,11 @@ BLOQUEADO = 2
 RUTA_SETTINGS = RAIZ / ".claude" / "settings.json"
 
 # Una regla "deny" por cada fila de la tabla de limites de CLAUDE.md, salvo los workflows.
-# src/aula/legado/ esta abierto solo durante el refactor de S5; el ultimo PR de S5 lo vuelve a
-# proteger aqui, en settings.json y en herramientas/hook_rutas.py.
 REGLAS_DENY_OBLIGATORIAS = (
     "Edit(manifiestos/**)",
     "Edit(labs/*/verificar.py)",
     "Edit(evals/dorado*/**)",
+    "Edit(src/aula/legado/**)",
 )
 
 # Lo que el agente puede cambiar, pero siempre preguntando al humano: sus propias reglas
@@ -89,6 +88,7 @@ def test_hook_rutas_bloquea_todas_las_rutas_de_limites():
     rutas_protegidas = [
         "labs/S3-contexto/verificar.py",
         "evals/dorado-v1/casos.json",
+        "src/aula/legado/calculo.py",
     ]
     for ruta in rutas_protegidas:
         assert codigo_hook_rutas(ruta) == BLOQUEADO, ruta

@@ -13,7 +13,8 @@
     "deny": [
       "Edit(manifiestos/**)",
       "Edit(labs/*/verificar.py)",
-      "Edit(evals/dorado*/**)"
+      "Edit(evals/dorado*/**)",
+      "Edit(src/aula/legado/**)"
     ],
     "ask": [
       "Edit(.claude/**)",

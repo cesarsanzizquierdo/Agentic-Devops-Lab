@@ -21,11 +21,10 @@ BLOQUEAR = 2
 # "evals/dorado" no lleva barra final porque protege evals/dorado*/.
 # .github/workflows/ no esta aqui: la regla "ask" de settings.json pregunta al humano
 # antes de cada cambio. Si el hook la bloqueara, la pregunta nunca llegaria a salir.
-# src/aula/legado/ esta abierto solo durante el refactor de S5, con la caracterizacion ya en
-# main y aprobacion humana explicita. El ultimo PR de S5 lo vuelve a proteger.
 PREFIJOS_PROTEGIDOS = (
     "manifiestos/",
     "evals/dorado",
+    "src/aula/legado/",
 )
 
 
