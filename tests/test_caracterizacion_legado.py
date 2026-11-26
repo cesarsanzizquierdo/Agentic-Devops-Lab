@@ -58,13 +58,16 @@ def test_no_documentado_1_la_convalidada_no_entra_en_la_media():
     assert resultado["creditos_superados"] == 12
 
 
-def test_no_documentado_2_redondea_cada_asignatura_antes_de_sumar():
-    """6,004, 6,004 y 6,009 (6 creditos cada una) se redondean a 6,00, 6,00 y 6,01 antes de
-    sumar: la media es 6,0033, que da 6,00. Redondeando una sola vez al final daria 6,01."""
+def test_no_documentado_2_la_media_se_redondea_una_sola_vez_al_final():
+    """Antes del refactor redondeaba cada asignatura antes de sumar: 6,004, 6,004 y 6,009
+    (6 creditos cada una) pasaban a 6,00, 6,00 y 6,01, y la media 6,0033 daba 6,00.
+
+    Cambiado por D-03 (invariante 1, SPEC-002 CA-04): la media real es 6,00567 y se redondea
+    una sola vez, al final: 6,01."""
     resultado = calcular(registro("MAT101", "aprobada", 6.004), registro("FIS101", "aprobada", 6.004),
                          registro("ALG101", "aprobada", 6.009))
 
-    assert como_decimal(resultado["nota_media"]) == Decimal("6.00")
+    assert como_decimal(resultado["nota_media"]) == Decimal("6.01")
 
 
 def test_la_nota_se_redondea_en_coma_flotante():

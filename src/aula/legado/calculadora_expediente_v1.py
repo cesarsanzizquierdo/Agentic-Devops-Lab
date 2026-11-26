@@ -84,14 +84,14 @@ def ultima_aprobada(registros):
 
 
 def nota_que_cuenta(registros):
-    """La nota de la ultima aprobada, o None si no hay ninguna con nota.
+    """La nota de la ultima aprobada, sin redondear, o None si no hay ninguna con nota.
 
-    Se redondea aqui, por asignatura y antes de acumular (comportamiento no documentado 2).
+    D-03: ya no se redondea por asignatura; la media se redondea una sola vez, al final.
     """
     aprobada = ultima_aprobada(registros)
     if aprobada is None or aprobada.get("nota") is None:
         return None
-    return round(float(aprobada["nota"]), DECIMALES)
+    return float(aprobada["nota"])
 
 
 # --- los calculos del expediente -------------------------------------------------

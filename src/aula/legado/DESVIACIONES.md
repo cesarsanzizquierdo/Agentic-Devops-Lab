@@ -38,6 +38,20 @@ del repositorio las usa desde fuera.
   recalcularla y avisar a secretaria antes de desplegar.
 - **Expedientes afectados:** 360 de 500.
 
+## D-03. La media se redondea una sola vez, al final
+
+- **Categoria:** correccion de defecto (comportamiento no documentado 2).
+- **Que cambia:** la nota de cada asignatura se redondeaba a dos decimales antes de sumarla;
+  ahora se suma sin redondear y solo se redondea la media final. Ejemplo: 6,004, 6,004 y 6,009
+  (6 creditos cada una) daban 6,00 y ahora 6,01.
+- **Causa:** contradice el invariante 1 de CLAUDE.md y SPEC-002 CA-04: un redondeo intermedio
+  altera la media. El fichero decia que de este redondeo dependia la ordenacion de becas, y por
+  eso mismo no puede estar mal.
+- **Efecto aguas abajo:** cambia la nota media de 35 de los 500 expedientes, siempre en 0,01 como
+  mucho. Al ordenar por media, 79 estudiantes cambian de puesto: la ordenacion de becas hay que
+  recalcularla.
+- **Expedientes afectados:** 35 de 500 (medido despues de D-02).
+
 ## Deuda conocida que se conserva
 
 - `MAX_CONV = 6` en `puede_matricular`: repite el `max_convocatorias` de PLAN-2024. La funcion no
