@@ -1,8 +1,12 @@
 """Equivalencia del modulo heredado sobre el corpus de 500 expedientes.
 
 Ejecuta el original congelado (tests/oraculo/calculadora_expediente_v1_original.py) y el modulo
-actual (src/aula/legado/calculadora_expediente_v1.py) sobre datos/expedientes_sinteticos.json, y
+actual (src/aula/legado/calculadora_expediente_v1.py) sobre los 500 expedientes del corpus, y
 compara nota_media, creditos_superados y progreso_pct expediente a expediente.
+
+El corpus se genera con herramientas/generar_corpus.py, que es determinista (misma semilla, mismo
+corpus). No se lee de datos/expedientes_sinteticos.json porque ese fichero esta en .gitignore: en
+el CI no existe.
 
 Una diferencia solo esta justificada si la explica una desviacion declarada en
 src/aula/legado/DESVIACIONES.md:
@@ -14,7 +18,6 @@ diferencia es una desviacion sin justificar y el test falla.
 """
 import hashlib
 import importlib.util
-import json
 import re
 from decimal import Decimal
 from pathlib import Path
@@ -22,10 +25,10 @@ from pathlib import Path
 import pytest
 
 from aula.legado import calculadora_expediente_v1 as actual
+from herramientas.generar_corpus import generar
 
 RAIZ = Path(__file__).resolve().parents[1]
 RUTA_ORACULO = RAIZ / "tests" / "oraculo" / "calculadora_expediente_v1_original.py"
-RUTA_CORPUS = RAIZ / "datos" / "expedientes_sinteticos.json"
 RUTA_PLAN = str(RAIZ / "datos" / "planes" / "PLAN-2024.json")
 RUTA_DESVIACIONES = RAIZ / "src" / "aula" / "legado" / "DESVIACIONES.md"
 # Blob de git del legado tal como llego en el primer commit del repositorio (5d2bd54).
@@ -118,7 +121,7 @@ def test_el_oraculo_es_la_copia_exacta_del_original():
 
 
 def test_equivalencia_sobre_el_corpus_sin_desviaciones_sin_justificar():
-    corpus = json.loads(RUTA_CORPUS.read_text(encoding="utf-8"))
+    corpus = generar()
     oraculo = cargar_oraculo()
     vaciar_cache(oraculo)
     vaciar_cache(actual)
