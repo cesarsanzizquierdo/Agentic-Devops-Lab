@@ -14,8 +14,6 @@ Historico (lo poco que se sabe):
 """
 import json
 
-# Lo que suma una convalidada en el numerador de la media (comportamiento no documentado 1).
-NOTA_CONVALIDADA = 5.0
 DECIMALES = 2
 # Repite max_convocatorias de PLAN-2024; ver la deuda conocida en DESVIACIONES.md.
 MAX_CONV = 6
@@ -107,9 +105,7 @@ def media(expediente, asignaturas):
         if creditos == 0:
             continue     # fuera del plan
         if esta_convalidada(registros):
-            # Comportamiento no documentado 1: suma en el numerador y no en el denominador.
-            numerador = numerador + NOTA_CONVALIDADA * creditos
-            continue
+            continue     # D-02: la convalidada no entra en la media (SPEC-002 CA-03)
         nota = nota_que_cuenta(registros)
         if nota is None:
             continue

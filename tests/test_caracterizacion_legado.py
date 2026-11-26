@@ -46,12 +46,15 @@ def calcular(*registros):
 
 # --- los dos comportamientos que el propio fichero marca como no documentados ---
 
-def test_no_documentado_1_la_convalidada_suma_5_arriba_y_no_abajo():
-    """La convalidada suma 5,0 x creditos en el numerador y no suma sus creditos en el
-    denominador: (6,0 x 6 + 5,0 x 6) / 6 = 11,0, por encima del maximo de 10."""
+def test_no_documentado_1_la_convalidada_no_entra_en_la_media():
+    """Antes del refactor la convalidada sumaba 5,0 x creditos en el numerador y nada en el
+    denominador: (6,0 x 6 + 5,0 x 6) / 6 = 11,0, por encima del maximo de 10.
+
+    Cambiado por D-02 (SPEC-002 CA-03): no entra ni arriba ni abajo, y la media es 6,0. Sus
+    creditos siguen contando como superados (CA-05)."""
     resultado = calcular(registro("MAT101", "aprobada", 6.0), registro("FIS101", "convalidada"))
 
-    assert como_decimal(resultado["nota_media"]) == Decimal("11.0")
+    assert como_decimal(resultado["nota_media"]) == Decimal("6.0")
     assert resultado["creditos_superados"] == 12
 
 
@@ -81,12 +84,13 @@ def test_solo_convalidadas_da_media_0_aunque_haya_creditos():
 
 
 def test_la_convalidacion_tiene_prioridad_sobre_la_aprobada_de_la_misma_asignatura():
-    """MAT101 cuenta como convalidada (5,0 arriba, nada abajo) y su 9,0 se ignora:
-    (5,0 x 6 + 7,0 x 6) / 6 = 12,0."""
+    """MAT101 cuenta como convalidada y su 9,0 se ignora. Antes del refactor daba
+    (5,0 x 6 + 7,0 x 6) / 6 = 12,0; con D-02 la convalidada no entra y la media es la de
+    FIS101: 7,0."""
     resultado = calcular(registro("MAT101", "convalidada"), registro("MAT101", "aprobada", 9.0),
                          registro("FIS101", "aprobada", 7.0))
 
-    assert como_decimal(resultado["nota_media"]) == Decimal("12.0")
+    assert como_decimal(resultado["nota_media"]) == Decimal("7.0")
     assert resultado["creditos_superados"] == 12
 
 

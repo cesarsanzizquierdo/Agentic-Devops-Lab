@@ -23,6 +23,21 @@ del repositorio las usa desde fuera.
   `AttributeError`; habria que avisar a secretaria antes de desplegar.
 - **Expedientes afectados:** 0 de 500.
 
+## D-02. La convalidada no entra en la media
+
+- **Categoria:** correccion de defecto (comportamiento no documentado 1).
+- **Que cambia:** la convalidada sumaba 5,0 x creditos en el numerador y nada en el
+  denominador; ahora no entra en la media. Sus creditos siguen contando como superados.
+  Ejemplo: una aprobada con 6,0 y una convalidada (6 creditos cada una) daban 11,0 y ahora 6,0.
+- **Causa:** contradice SPEC-002 CA-03 y su ambiguedad A-02, que ya lo describia como
+  "comportamiento defectuoso detectado en `calculadora_expediente_v1.py`": distorsiona la media
+  y puede dar notas por encima de 10.
+- **Efecto aguas abajo:** cambia la nota media de 360 de los 500 expedientes (los que tienen
+  alguna convalidada), hasta 10,00 puntos; 37 tenian una media por encima de 10. Al ordenar por
+  media para becas, 469 estudiantes cambian de puesto: la ordenacion de becas hay que
+  recalcularla y avisar a secretaria antes de desplegar.
+- **Expedientes afectados:** 360 de 500.
+
 ## Deuda conocida que se conserva
 
 - `MAX_CONV = 6` en `puede_matricular`: repite el `max_convocatorias` de PLAN-2024. La funcion no
