@@ -80,6 +80,21 @@ del repositorio las usa desde fuera.
   una ejecucion, ahora repite el calculo (milisegundos por expediente).
 - **Expedientes afectados:** 0 de 500.
 
+## D-06. Las reglas son las de SPEC-002 y una entrada mal formada es un error
+
+- **Categoria:** eliminacion de duplicidad y robustez.
+- **Que cambia:** `calcular` ya no tiene sus propias reglas: convierte el expediente al dominio
+  y usa `nota_media_ponderada`, `creditos_superados` y `progreso` de `src/aula/reglas/media.py`,
+  la unica implementacion de SPEC-002. Al convertirlo, un registro con un estado que no existe
+  (por ejemplo "aprobado") o sin convocatoria lanza un error; antes se ignoraba sin avisar.
+- **Causa:** habia dos implementaciones de las mismas reglas, y la del legado ya daba los mismos
+  numeros que la de SPEC-002 despues de D-02, D-03 y D-04. Un dato mal escrito tiene que pararse,
+  no producir una media incorrecta.
+- **Efecto aguas abajo:** ningun numero cambia (comparados los 500 expedientes, valor y tipo,
+  con la version anterior). Si el proceso nocturno recibe un expediente mal formado, ahora se
+  para con `ValueError` o `KeyError` en vez de calcular mal: hay que revisar ese dato.
+- **Expedientes afectados:** 0 de 500.
+
 ## Deuda conocida que se conserva
 
 - `MAX_CONV = 6` en `puede_matricular`: repite el `max_convocatorias` de PLAN-2024. La funcion no

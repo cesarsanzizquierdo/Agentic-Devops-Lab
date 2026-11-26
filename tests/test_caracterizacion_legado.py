@@ -154,6 +154,13 @@ def test_un_expediente_vacio_da_ceros():
     assert como_decimal(resultado["progreso_pct"]) == Decimal("0")
 
 
+def test_un_estado_que_no_existe_es_un_error():
+    """Antes del refactor un estado mal escrito ("aprobado") se ignoraba sin avisar: la
+    asignatura no contaba y el resultado salia mal. Cambiado por D-06: lanza ValueError."""
+    with pytest.raises(ValueError):
+        calcular(registro("MAT101", "aprobado", 6.0))
+
+
 # --- convocatorias ---
 
 def test_las_convocatorias_cuentan_todo_menos_las_convalidaciones():
