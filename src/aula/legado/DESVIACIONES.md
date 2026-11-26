@@ -52,6 +52,21 @@ del repositorio las usa desde fuera.
   recalcularla.
 - **Expedientes afectados:** 35 de 500 (medido despues de D-02).
 
+## D-04. Decimal en lugar de coma flotante
+
+- **Categoria:** correccion de defecto y cambio de tipo.
+- **Que cambia:** la media y el progreso se calculan con `Decimal` y se redondean half-up a dos
+  decimales; `calcular` devuelve `nota_media` y `progreso_pct` como `Decimal` en vez de `float`.
+  Ejemplos: una nota de 6,675 daba 6,67 (en coma flotante se guarda como 6,67499...) y ahora
+  6,68; un progreso de 3,125 % daba 3,12 (el redondeo de Python lleva el empate al par) y
+  ahora 3,13.
+- **Causa:** el invariante 2 de CLAUDE.md: todo calculo de calificacion usa `Decimal`.
+- **Efecto aguas abajo:** cambia la nota media de 4 de los 500 expedientes y el progreso de 61,
+  siempre en 0,01 como mucho; al ordenar por media, 8 estudiantes cambian de puesto. Quien
+  reciba el resultado recibe `Decimal`: si lo serializa a JSON tiene que convertirlo a texto con
+  dos decimales, como hace la API (`formatear_decimal`, SPEC-002 CA-08).
+- **Expedientes afectados:** 4 de 500 en la media y 61 en el progreso (medido despues de D-03).
+
 ## Deuda conocida que se conserva
 
 - `MAX_CONV = 6` en `puede_matricular`: repite el `max_convocatorias` de PLAN-2024. La funcion no

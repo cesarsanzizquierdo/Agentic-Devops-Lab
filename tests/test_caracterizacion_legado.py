@@ -70,11 +70,13 @@ def test_no_documentado_2_la_media_se_redondea_una_sola_vez_al_final():
     assert como_decimal(resultado["nota_media"]) == Decimal("6.01")
 
 
-def test_la_nota_se_redondea_en_coma_flotante():
-    """round(6.675, 2) da 6,67 porque 6,675 no se puede guardar exacto en coma flotante."""
+def test_la_nota_6675_se_redondea_hacia_arriba():
+    """Antes del refactor daba 6,67: en coma flotante 6,675 se guarda como 6,67499999...
+
+    Cambiado por D-04 (invariante 2): con Decimal y half-up, 6,675 da 6,68."""
     resultado = calcular(registro("MAT101", "aprobada", 6.675))
 
-    assert como_decimal(resultado["nota_media"]) == Decimal("6.67")
+    assert como_decimal(resultado["nota_media"]) == Decimal("6.68")
 
 
 # --- la nota media ---
@@ -136,11 +138,12 @@ def test_los_creditos_superados_cuentan_aprobadas_y_convalidadas_y_no_suspensas(
     assert como_decimal(resultado["progreso_pct"]) == Decimal("6.25")
 
 
-def test_el_progreso_redondea_el_empate_hacia_el_par():
-    """6 x 100 / 192 = 3,125 exacto; round() de Python lleva el empate al par: 3,12."""
+def test_el_empate_del_progreso_se_redondea_hacia_arriba():
+    """6 x 100 / 192 = 3,125 exacto. Antes del refactor round() de Python llevaba el empate al
+    par: 3,12. Cambiado por D-04: con Decimal y half-up da 3,13."""
     resultado = calcular(registro("MAT101", "aprobada", 5.0))
 
-    assert como_decimal(resultado["progreso_pct"]) == Decimal("3.12")
+    assert como_decimal(resultado["progreso_pct"]) == Decimal("3.13")
 
 
 def test_un_expediente_vacio_da_ceros():

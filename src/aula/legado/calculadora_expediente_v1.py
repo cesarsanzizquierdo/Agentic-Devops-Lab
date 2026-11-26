@@ -13,8 +13,11 @@ Historico (lo poco que se sabe):
   2026-11  S5: caracterizacion, equivalencia sobre 500 expedientes y refactor
 """
 import json
+from decimal import ROUND_HALF_UP, Decimal
 
-DECIMALES = 2
+# D-04: todo con Decimal y redondeo half-up (invariante 2).
+DOS_DECIMALES = Decimal("0.01")
+CERO = Decimal("0.00")
 # Repite max_convocatorias de PLAN-2024; ver la deuda conocida en DESVIACIONES.md.
 MAX_CONV = 6
 # Resultados ya calculados, por estudiante y plan.
@@ -91,15 +94,19 @@ def nota_que_cuenta(registros):
     aprobada = ultima_aprobada(registros)
     if aprobada is None or aprobada.get("nota") is None:
         return None
-    return float(aprobada["nota"])
+    return Decimal(str(aprobada["nota"]))
+
+
+def redondear(valor):
+    return valor.quantize(DOS_DECIMALES, rounding=ROUND_HALF_UP)
 
 
 # --- los calculos del expediente -------------------------------------------------
 
 def media(expediente, asignaturas):
-    """Media ponderada por creditos de las asignaturas con nota."""
-    numerador = 0.0
-    denominador = 0.0
+    """Media ponderada por creditos de las asignaturas con nota, como Decimal."""
+    numerador = Decimal("0")
+    denominador = 0
     for codigo, registros in registros_por_asignatura(expediente).items():
         creditos = creditos_de(asignaturas, codigo)
         if creditos == 0:
@@ -112,8 +119,8 @@ def media(expediente, asignaturas):
         numerador = numerador + nota * creditos
         denominador = denominador + creditos
     if denominador == 0:
-        return 0.0
-    return round(numerador / denominador, DECIMALES)
+        return CERO
+    return redondear(numerador / denominador)
 
 
 def creditos_superados(expediente, asignaturas):
@@ -125,12 +132,12 @@ def creditos_superados(expediente, asignaturas):
 
 
 def progreso(expediente, plan, asignaturas):
-    """Porcentaje de creditos superados sobre los del titulo."""
+    """Porcentaje de creditos superados sobre los del titulo, como Decimal."""
     creditos_del_titulo = plan["creditos_titulo"]
     if creditos_del_titulo == 0:
-        return 0.0
+        return CERO
     superados = creditos_superados(expediente, asignaturas)
-    return round((superados * 100.0) / creditos_del_titulo, DECIMALES)
+    return redondear(Decimal(superados) * 100 / Decimal(creditos_del_titulo))
 
 
 # --- convocatorias ---------------------------------------------------------------
