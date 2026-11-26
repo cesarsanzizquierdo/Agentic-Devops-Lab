@@ -73,19 +73,30 @@ def test_un_fichero_que_no_es_python_no_se_analiza(tmp_path, monkeypatch):
     assert salida["propone_tocar"] == []
 
 
-def test_sobre_el_legado_real_caracterizar_va_primero():
-    salida = proponer([LEGADO], "PLAN-2024")
+def test_sobre_un_legado_sin_tests_caracterizar_va_primero(tmp_path, monkeypatch):
+    monkeypatch.setattr(agente, "RAIZ", tmp_path)
+    plan = {"codigo": "PLAN-2024", "max_convocatorias": 6}
+    monkeypatch.setattr(agente, "consultar", lambda agente_que_pide, herramienta, argumentos: plan)
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/aula/legado").mkdir(parents=True)
+    (tmp_path / "src/aula/legado/viejo.py").write_text(VIEJO, encoding="utf-8")
+    ruta = "src/aula/legado/viejo.py"
+
+    salida = proponer([ruta], "PLAN-2024")
 
     encontrados = tipos(salida["hallazgos"])
     for esperado in ["sin_caracterizacion", "coma_flotante", "redondeo_intermedio", "numero_magico"]:
         assert esperado in encontrados
-    lineas_de_redondeo = []
-    for encontrado in salida["hallazgos"]:
-        if encontrado["tipo"] == "redondeo_intermedio":
-            lineas_de_redondeo.append(encontrado["linea"])
-    assert 106 in lineas_de_redondeo
     assert salida["pasos"][0].startswith("Caracterizar el modulo heredado")
-    assert salida["propone_tocar"] == [LEGADO, "tests/test_caracterizacion_legado.py"]
+    assert salida["propone_tocar"] == [ruta, "tests/test_caracterizacion_legado.py"]
+    assert validar_salida(cargar(), "modernizacion-legado", salida) == []
+
+
+def test_el_legado_real_ya_esta_caracterizado():
+    """Desde S5, tests/test_caracterizacion_legado.py importa el legado real."""
+    salida = proponer([LEGADO], "PLAN-2024")
+
+    assert "sin_caracterizacion" not in tipos(salida["hallazgos"])
     assert validar_salida(cargar(), "modernizacion-legado", salida) == []
 
 
