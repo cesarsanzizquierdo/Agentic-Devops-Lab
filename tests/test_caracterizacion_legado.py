@@ -171,17 +171,19 @@ def test_las_convocatorias_cuentan_todo_menos_las_convalidaciones():
 
 # --- el punto de entrada del proceso nocturno ---
 
-def test_la_cache_devuelve_el_resultado_antiguo_si_el_estudiante_cambia():
-    """calcular() guarda el resultado por estudiante y plan: si el expediente cambia y se vuelve a
-    calcular, devuelve el de antes."""
+def test_si_el_estudiante_cambia_se_recalcula():
+    """Antes del refactor calcular() guardaba el resultado por estudiante y plan, y si el
+    expediente cambiaba devolvia el de antes (6,0 y 6 creditos).
+
+    Cambiado por D-05: se recalcula siempre: (6,0 x 6 + 8,0 x 6) / 12 = 7,00 y 12 creditos."""
     datos = expediente(registro("MAT101", "aprobada", 6.0))
     primero = legado.calcular(datos, RUTA_PLAN)
     datos["registros"].append(registro("FIS101", "aprobada", 8.0))
     segundo = legado.calcular(datos, RUTA_PLAN)
 
-    assert como_decimal(segundo["nota_media"]) == Decimal("6.0")
-    assert segundo["creditos_superados"] == 6
-    assert segundo == primero
+    assert como_decimal(primero["nota_media"]) == Decimal("6.0")
+    assert como_decimal(segundo["nota_media"]) == Decimal("7.00")
+    assert segundo["creditos_superados"] == 12
 
 
 def test_calcular_lote_devuelve_un_resultado_por_estudiante_en_el_mismo_orden():

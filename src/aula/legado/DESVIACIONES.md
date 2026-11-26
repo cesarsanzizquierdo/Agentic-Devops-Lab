@@ -67,6 +67,19 @@ del repositorio las usa desde fuera.
   dos decimales, como hace la API (`formatear_decimal`, SPEC-002 CA-08).
 - **Expedientes afectados:** 4 de 500 en la media y 61 en el progreso (medido despues de D-03).
 
+## D-05. Sin cache de resultados
+
+- **Categoria:** correccion de defecto (robustez).
+- **Que cambia:** `calcular` guardaba cada resultado en `_CACHE` por estudiante y plan, y si se
+  volvia a pedir devolvia el guardado aunque el expediente hubiera cambiado. Ahora calcula
+  siempre con el expediente que recibe.
+- **Causa:** un proceso que recalcula a un estudiante despues de registrarle una nota recibia
+  el resultado antiguo, sin ningun aviso.
+- **Efecto aguas abajo:** ninguno en el corpus: cada expediente se calcula una vez. El proceso
+  nocturno recibe siempre el resultado actual; si calculara varias veces al mismo estudiante en
+  una ejecucion, ahora repite el calculo (milisegundos por expediente).
+- **Expedientes afectados:** 0 de 500.
+
 ## Deuda conocida que se conserva
 
 - `MAX_CONV = 6` en `puede_matricular`: repite el `max_convocatorias` de PLAN-2024. La funcion no

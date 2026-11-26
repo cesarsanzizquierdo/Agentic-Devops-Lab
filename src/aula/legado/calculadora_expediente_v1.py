@@ -20,8 +20,6 @@ DOS_DECIMALES = Decimal("0.01")
 CERO = Decimal("0.00")
 # Repite max_convocatorias de PLAN-2024; ver la deuda conocida en DESVIACIONES.md.
 MAX_CONV = 6
-# Resultados ya calculados, por estudiante y plan.
-_CACHE = {}
 
 
 # --- el plan ---------------------------------------------------------------------
@@ -161,20 +159,14 @@ def puede_matricular(expediente, codigo):
 # --- puntos de entrada del proceso nocturno --------------------------------------
 
 def calcular(expediente, ruta_plan):
-    """Resultado de un estudiante. Lo guarda en _CACHE y, si se vuelve a pedir para el mismo
-    estudiante y plan, devuelve el guardado sin recalcular."""
-    clave = expediente["estudiante_id"] + "|" + ruta_plan
-    if clave in _CACHE:
-        return _CACHE[clave]
+    """Resultado de un estudiante, calculado siempre con su expediente actual (D-05)."""
     plan, asignaturas = cargar_plan(ruta_plan)
-    resultado = {
+    return {
         "estudiante_id": expediente["estudiante_id"],
         "nota_media": media(expediente, asignaturas),
         "creditos_superados": creditos_superados(expediente, asignaturas),
         "progreso_pct": progreso(expediente, plan, asignaturas),
     }
-    _CACHE[clave] = resultado
-    return resultado
 
 
 def calcular_lote(expedientes, ruta_plan):
