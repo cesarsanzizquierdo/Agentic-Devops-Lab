@@ -22,9 +22,6 @@ from aula.dominio.modelos import EstadoRegistro, Expediente, RegistroAcademico
 from aula.reglas import media as reglas
 from aula.reglas.planes import cargar_plan
 
-# Repite max_convocatorias de PLAN-2024; ver la deuda conocida en DESVIACIONES.md.
-MAX_CONV = 6
-
 
 # --- del formato del proceso nocturno al dominio ---------------------------------
 
@@ -68,8 +65,12 @@ def convocatorias(expediente):
 
 
 def puede_matricular(expediente, codigo):
-    """False si ya se han consumido MAX_CONV convocatorias de la asignatura."""
-    return convocatorias(expediente).get(codigo, 0) < MAX_CONV
+    """False si ya se han consumido las convocatorias maximas del plan del estudiante (D-07).
+
+    Es la misma regla que aplica la matricula en src/aula/reglas/motor.py (SPEC-001).
+    """
+    plan = cargar_plan(expediente["plan"])
+    return convocatorias(expediente).get(codigo, 0) < plan.max_convocatorias
 
 
 # --- puntos de entrada del proceso nocturno --------------------------------------

@@ -95,7 +95,20 @@ del repositorio las usa desde fuera.
   para con `ValueError` o `KeyError` en vez de calcular mal: hay que revisar ese dato.
 - **Expedientes afectados:** 0 de 500.
 
-## Deuda conocida que se conserva
+## D-07. El maximo de convocatorias es el del plan del estudiante
 
-- `MAX_CONV = 6` en `puede_matricular`: repite el `max_convocatorias` de PLAN-2024. La funcion no
-  recibe el plan, asi que no puede leerlo sin cambiar su firma, que es parte de la API historica.
+- **Categoria:** correccion de defecto (numero fijo en el codigo).
+- **Que cambia:** `puede_matricular` comparaba con `MAX_CONV = 6`, un numero escrito en el codigo
+  que solo coincidia con PLAN-2024. Ahora lee `max_convocatorias` del plan que indica el propio
+  expediente (`"plan"`), igual que la matricula en `src/aula/reglas/motor.py` (SPEC-001). La
+  firma no cambia. Ejemplo: con un plan de 4 convocatorias, un estudiante con 5 suspensos podia
+  matricularse otra vez (5 < 6) y ahora no (5 >= 4).
+- **Causa:** si el plan cambia su maximo, el codigo no se enteraba.
+- **Efecto aguas abajo:** ninguno con PLAN-2024: 0 respuestas distintas en 15.000 preguntas
+  (500 expedientes por 30 asignaturas). Un expediente sin `"plan"`, o con un plan que no existe
+  en `datos/planes/`, ahora se para con un error en vez de usar el 6.
+- **Expedientes afectados:** 0 de 500.
+
+## Deuda conocida
+
+Ninguna: el agente de modernizacion de S4b ya no encuentra hallazgos en el modulo.

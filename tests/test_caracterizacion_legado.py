@@ -9,12 +9,14 @@ convocatorias y puede_matricular), no de sus funciones internas, que el refactor
 Los numeros se comparan con Decimal(str(valor)): asi el test vale tanto si el modulo devuelve
 float como si devuelve Decimal.
 """
+import json
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
 from aula.legado import calculadora_expediente_v1 as legado
+from aula.reglas import planes
 
 RUTA_PLAN = str(Path(__file__).resolve().parents[1] / "datos" / "planes" / "PLAN-2024.json")
 
@@ -174,6 +176,27 @@ def test_las_convocatorias_cuentan_todo_menos_las_convalidaciones():
     assert legado.puede_matricular(datos, "MAT101") is False     # 6 consumidas: el maximo
     assert legado.puede_matricular(datos, "ALG101") is True
     assert legado.puede_matricular(datos, "FIS101") is True      # la convalidacion no consume
+
+
+def test_el_maximo_de_convocatorias_es_el_del_plan_del_estudiante(tmp_path, monkeypatch):
+    """Antes del refactor el maximo era un 6 fijo en el codigo (MAX_CONV), el mismo de PLAN-2024.
+
+    Cambiado por D-07: se lee del plan del estudiante. Con un plan de 4 convocatorias, 5
+    suspensos ya no permiten matricularse; con PLAN-2024 (6) todavia si."""
+    plan = json.loads(Path(RUTA_PLAN).read_text(encoding="utf-8"))
+    (tmp_path / "PLAN-2024.json").write_text(json.dumps(plan), encoding="utf-8")
+    plan["codigo"] = "PLAN-2026"
+    plan["max_convocatorias"] = 4
+    (tmp_path / "PLAN-2026.json").write_text(json.dumps(plan), encoding="utf-8")
+    monkeypatch.setattr(planes, "RUTA_PLANES", tmp_path)
+    suspensas = []
+    for numero in range(1, 6):
+        suspensas.append(registro("MAT101", "suspensa", 2.0, convocatoria=numero))
+    datos = expediente(*suspensas)
+
+    assert legado.puede_matricular(datos, "MAT101") is True      # PLAN-2024: 5 < 6
+    datos["plan"] = "PLAN-2026"
+    assert legado.puede_matricular(datos, "MAT101") is False     # PLAN-2026: 5 >= 4
 
 
 # --- el punto de entrada del proceso nocturno ---
