@@ -9,12 +9,14 @@ convocatorias y puede_matricular), no de sus funciones internas, que el refactor
 Los numeros se comparan con Decimal(str(valor)): asi el test vale tanto si el modulo devuelve
 float como si devuelve Decimal.
 """
+import json
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
 from aula.legado import calculadora_expediente_v1 as legado
+from aula.reglas import planes
 
 RUTA_PLAN = str(Path(__file__).resolve().parents[1] / "datos" / "planes" / "PLAN-2024.json")
 
@@ -46,29 +48,37 @@ def calcular(*registros):
 
 # --- los dos comportamientos que el propio fichero marca como no documentados ---
 
-def test_no_documentado_1_la_convalidada_suma_5_arriba_y_no_abajo():
-    """La convalidada suma 5,0 x creditos en el numerador y no suma sus creditos en el
-    denominador: (6,0 x 6 + 5,0 x 6) / 6 = 11,0, por encima del maximo de 10."""
+def test_no_documentado_1_la_convalidada_no_entra_en_la_media():
+    """Antes del refactor la convalidada sumaba 5,0 x creditos en el numerador y nada en el
+    denominador: (6,0 x 6 + 5,0 x 6) / 6 = 11,0, por encima del maximo de 10.
+
+    Cambiado por D-02 (SPEC-002 CA-03): no entra ni arriba ni abajo, y la media es 6,0. Sus
+    creditos siguen contando como superados (CA-05)."""
     resultado = calcular(registro("MAT101", "aprobada", 6.0), registro("FIS101", "convalidada"))
 
-    assert como_decimal(resultado["nota_media"]) == Decimal("11.0")
+    assert como_decimal(resultado["nota_media"]) == Decimal("6.0")
     assert resultado["creditos_superados"] == 12
 
 
-def test_no_documentado_2_redondea_cada_asignatura_antes_de_sumar():
-    """6,004, 6,004 y 6,009 (6 creditos cada una) se redondean a 6,00, 6,00 y 6,01 antes de
-    sumar: la media es 6,0033, que da 6,00. Redondeando una sola vez al final daria 6,01."""
+def test_no_documentado_2_la_media_se_redondea_una_sola_vez_al_final():
+    """Antes del refactor redondeaba cada asignatura antes de sumar: 6,004, 6,004 y 6,009
+    (6 creditos cada una) pasaban a 6,00, 6,00 y 6,01, y la media 6,0033 daba 6,00.
+
+    Cambiado por D-03 (invariante 1, SPEC-002 CA-04): la media real es 6,00567 y se redondea
+    una sola vez, al final: 6,01."""
     resultado = calcular(registro("MAT101", "aprobada", 6.004), registro("FIS101", "aprobada", 6.004),
                          registro("ALG101", "aprobada", 6.009))
 
-    assert como_decimal(resultado["nota_media"]) == Decimal("6.00")
+    assert como_decimal(resultado["nota_media"]) == Decimal("6.01")
 
 
-def test_la_nota_se_redondea_en_coma_flotante():
-    """round(6.675, 2) da 6,67 porque 6,675 no se puede guardar exacto en coma flotante."""
+def test_la_nota_6675_se_redondea_hacia_arriba():
+    """Antes del refactor daba 6,67: en coma flotante 6,675 se guarda como 6,67499999...
+
+    Cambiado por D-04 (invariante 2): con Decimal y half-up, 6,675 da 6,68."""
     resultado = calcular(registro("MAT101", "aprobada", 6.675))
 
-    assert como_decimal(resultado["nota_media"]) == Decimal("6.67")
+    assert como_decimal(resultado["nota_media"]) == Decimal("6.68")
 
 
 # --- la nota media ---
@@ -81,12 +91,13 @@ def test_solo_convalidadas_da_media_0_aunque_haya_creditos():
 
 
 def test_la_convalidacion_tiene_prioridad_sobre_la_aprobada_de_la_misma_asignatura():
-    """MAT101 cuenta como convalidada (5,0 arriba, nada abajo) y su 9,0 se ignora:
-    (5,0 x 6 + 7,0 x 6) / 6 = 12,0."""
+    """MAT101 cuenta como convalidada y su 9,0 se ignora. Antes del refactor daba
+    (5,0 x 6 + 7,0 x 6) / 6 = 12,0; con D-02 la convalidada no entra y la media es la de
+    FIS101: 7,0."""
     resultado = calcular(registro("MAT101", "convalidada"), registro("MAT101", "aprobada", 9.0),
                          registro("FIS101", "aprobada", 7.0))
 
-    assert como_decimal(resultado["nota_media"]) == Decimal("12.0")
+    assert como_decimal(resultado["nota_media"]) == Decimal("7.0")
     assert resultado["creditos_superados"] == 12
 
 
@@ -129,11 +140,12 @@ def test_los_creditos_superados_cuentan_aprobadas_y_convalidadas_y_no_suspensas(
     assert como_decimal(resultado["progreso_pct"]) == Decimal("6.25")
 
 
-def test_el_progreso_redondea_el_empate_hacia_el_par():
-    """6 x 100 / 192 = 3,125 exacto; round() de Python lleva el empate al par: 3,12."""
+def test_el_empate_del_progreso_se_redondea_hacia_arriba():
+    """6 x 100 / 192 = 3,125 exacto. Antes del refactor round() de Python llevaba el empate al
+    par: 3,12. Cambiado por D-04: con Decimal y half-up da 3,13."""
     resultado = calcular(registro("MAT101", "aprobada", 5.0))
 
-    assert como_decimal(resultado["progreso_pct"]) == Decimal("3.12")
+    assert como_decimal(resultado["progreso_pct"]) == Decimal("3.13")
 
 
 def test_un_expediente_vacio_da_ceros():
@@ -142,6 +154,13 @@ def test_un_expediente_vacio_da_ceros():
     assert como_decimal(resultado["nota_media"]) == Decimal("0")
     assert resultado["creditos_superados"] == 0
     assert como_decimal(resultado["progreso_pct"]) == Decimal("0")
+
+
+def test_un_estado_que_no_existe_es_un_error():
+    """Antes del refactor un estado mal escrito ("aprobado") se ignoraba sin avisar: la
+    asignatura no contaba y el resultado salia mal. Cambiado por D-06: lanza ValueError."""
+    with pytest.raises(ValueError):
+        calcular(registro("MAT101", "aprobado", 6.0))
 
 
 # --- convocatorias ---
@@ -159,19 +178,42 @@ def test_las_convocatorias_cuentan_todo_menos_las_convalidaciones():
     assert legado.puede_matricular(datos, "FIS101") is True      # la convalidacion no consume
 
 
+def test_el_maximo_de_convocatorias_es_el_del_plan_del_estudiante(tmp_path, monkeypatch):
+    """Antes del refactor el maximo era un 6 fijo en el codigo (MAX_CONV), el mismo de PLAN-2024.
+
+    Cambiado por D-07: se lee del plan del estudiante. Con un plan de 4 convocatorias, 5
+    suspensos ya no permiten matricularse; con PLAN-2024 (6) todavia si."""
+    plan = json.loads(Path(RUTA_PLAN).read_text(encoding="utf-8"))
+    (tmp_path / "PLAN-2024.json").write_text(json.dumps(plan), encoding="utf-8")
+    plan["codigo"] = "PLAN-2026"
+    plan["max_convocatorias"] = 4
+    (tmp_path / "PLAN-2026.json").write_text(json.dumps(plan), encoding="utf-8")
+    monkeypatch.setattr(planes, "RUTA_PLANES", tmp_path)
+    suspensas = []
+    for numero in range(1, 6):
+        suspensas.append(registro("MAT101", "suspensa", 2.0, convocatoria=numero))
+    datos = expediente(*suspensas)
+
+    assert legado.puede_matricular(datos, "MAT101") is True      # PLAN-2024: 5 < 6
+    datos["plan"] = "PLAN-2026"
+    assert legado.puede_matricular(datos, "MAT101") is False     # PLAN-2026: 5 >= 4
+
+
 # --- el punto de entrada del proceso nocturno ---
 
-def test_la_cache_devuelve_el_resultado_antiguo_si_el_estudiante_cambia():
-    """calcular() guarda el resultado por estudiante y plan: si el expediente cambia y se vuelve a
-    calcular, devuelve el de antes."""
+def test_si_el_estudiante_cambia_se_recalcula():
+    """Antes del refactor calcular() guardaba el resultado por estudiante y plan, y si el
+    expediente cambiaba devolvia el de antes (6,0 y 6 creditos).
+
+    Cambiado por D-05: se recalcula siempre: (6,0 x 6 + 8,0 x 6) / 12 = 7,00 y 12 creditos."""
     datos = expediente(registro("MAT101", "aprobada", 6.0))
     primero = legado.calcular(datos, RUTA_PLAN)
     datos["registros"].append(registro("FIS101", "aprobada", 8.0))
     segundo = legado.calcular(datos, RUTA_PLAN)
 
-    assert como_decimal(segundo["nota_media"]) == Decimal("6.0")
-    assert segundo["creditos_superados"] == 6
-    assert segundo == primero
+    assert como_decimal(primero["nota_media"]) == Decimal("6.0")
+    assert como_decimal(segundo["nota_media"]) == Decimal("7.00")
+    assert segundo["creditos_superados"] == 12
 
 
 def test_calcular_lote_devuelve_un_resultado_por_estudiante_en_el_mismo_orden():

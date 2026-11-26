@@ -1,9 +1,12 @@
 """Calculadora de expediente heredada: nota media, creditos superados y progreso.
 
 La usa el proceso nocturno de secretaria a traves de calcular() y calcular_lote(), y de ella
-depende la ordenacion de becas. Su comportamiento esta fijado en
-tests/test_caracterizacion_legado.py; cada diferencia con el original
-(tests/oraculo/calculadora_expediente_v1_original.py) se declara en DESVIACIONES.md.
+depende la ordenacion de becas. Las reglas ya no viven aqui: son las de SPEC-002, en
+src/aula/reglas/media.py, y este modulo solo adapta el formato del proceso nocturno (un
+diccionario por expediente y la ruta del fichero del plan) al dominio.
+
+Su comportamiento esta fijado en tests/test_caracterizacion_legado.py; cada diferencia con el
+original (tests/oraculo/calculadora_expediente_v1_original.py) se declara en DESVIACIONES.md.
 
 Historico (lo poco que se sabe):
   2019-03  version inicial
@@ -12,129 +15,40 @@ Historico (lo poco que se sabe):
   2023-01  se anade progreso, sin tocar la media
   2026-11  S5: caracterizacion, equivalencia sobre 500 expedientes y refactor
 """
-import json
+from decimal import Decimal
+from pathlib import Path
 
-# Lo que suma una convalidada en el numerador de la media (comportamiento no documentado 1).
-NOTA_CONVALIDADA = 5.0
-DECIMALES = 2
-# Repite max_convocatorias de PLAN-2024; ver la deuda conocida en DESVIACIONES.md.
-MAX_CONV = 6
-# Resultados ya calculados, por estudiante y plan.
-_CACHE = {}
+from aula.dominio.modelos import EstadoRegistro, Expediente, RegistroAcademico
+from aula.reglas import media as reglas
+from aula.reglas.planes import cargar_plan
 
 
-# --- el plan ---------------------------------------------------------------------
+# --- del formato del proceso nocturno al dominio ---------------------------------
 
-def cargar_plan(ruta):
-    """Lee el plan: devuelve (plan, {codigo: asignatura})."""
-    with open(ruta, "r", encoding="utf-8") as fichero:
-        plan = json.load(fichero)
-    asignaturas = {}
-    for asignatura in plan["asignaturas"]:
-        asignaturas[asignatura["codigo"]] = asignatura
-    return plan, asignaturas
+def a_expediente(datos):
+    """El expediente del proceso nocturno (un diccionario) como Expediente del dominio.
 
-
-def creditos_de(asignaturas, codigo):
-    """Creditos de la asignatura en el plan; 0 si no pertenece al plan."""
-    if codigo in asignaturas:
-        return asignaturas[codigo]["creditos"]
-    return 0
-
-
-# --- las reglas de una asignatura ------------------------------------------------
-
-def registros_por_asignatura(expediente):
-    """{codigo: [registros]}, en el orden en que aparece cada asignatura por primera vez.
-
-    El orden importa: la media suma en coma flotante, y sumar en otro orden podria cambiar el
-    ultimo decimal.
+    Un estado que no existe lanza ValueError (D-06): antes se ignoraba sin avisar.
     """
-    agrupados = {}
-    for registro in expediente["registros"]:
-        codigo = registro["codigo_asignatura"]
-        if codigo not in agrupados:
-            agrupados[codigo] = []
-        agrupados[codigo].append(registro)
-    return agrupados
+    registros = []
+    for registro in datos["registros"]:
+        nota = registro.get("nota")
+        if nota is not None:
+            nota = Decimal(str(nota))
+        registros.append(RegistroAcademico(
+            codigo_asignatura=registro["codigo_asignatura"],
+            curso_academico=registro.get("curso_academico", ""),
+            convocatoria=registro["convocatoria"],
+            estado=EstadoRegistro(registro["estado"]),
+            nota=nota,
+        ))
+    return Expediente(datos["estudiante_id"], datos.get("plan", ""), registros)
 
 
-def esta_convalidada(registros):
-    for registro in registros:
-        if registro["estado"] == "convalidada":
-            return True
-    return False
-
-
-def esta_superada(registros):
-    """Aprobada o convalidada en algun registro: sus creditos cuentan como superados."""
-    for registro in registros:
-        if registro["estado"] in ("aprobada", "convalidada"):
-            return True
-    return False
-
-
-def ultima_aprobada(registros):
-    """El registro aprobado de mayor convocatoria (con empate, el primero), o None."""
-    elegido = None
-    for registro in registros:
-        if registro["estado"] != "aprobada":
-            continue
-        if elegido is None or registro["convocatoria"] > elegido["convocatoria"]:
-            elegido = registro
-    return elegido
-
-
-def nota_que_cuenta(registros):
-    """La nota de la ultima aprobada, o None si no hay ninguna con nota.
-
-    Se redondea aqui, por asignatura y antes de acumular (comportamiento no documentado 2).
-    """
-    aprobada = ultima_aprobada(registros)
-    if aprobada is None or aprobada.get("nota") is None:
-        return None
-    return round(float(aprobada["nota"]), DECIMALES)
-
-
-# --- los calculos del expediente -------------------------------------------------
-
-def media(expediente, asignaturas):
-    """Media ponderada por creditos de las asignaturas con nota."""
-    numerador = 0.0
-    denominador = 0.0
-    for codigo, registros in registros_por_asignatura(expediente).items():
-        creditos = creditos_de(asignaturas, codigo)
-        if creditos == 0:
-            continue     # fuera del plan
-        if esta_convalidada(registros):
-            # Comportamiento no documentado 1: suma en el numerador y no en el denominador.
-            numerador = numerador + NOTA_CONVALIDADA * creditos
-            continue
-        nota = nota_que_cuenta(registros)
-        if nota is None:
-            continue
-        numerador = numerador + nota * creditos
-        denominador = denominador + creditos
-    if denominador == 0:
-        return 0.0
-    return round(numerador / denominador, DECIMALES)
-
-
-def creditos_superados(expediente, asignaturas):
-    total = 0
-    for codigo, registros in registros_por_asignatura(expediente).items():
-        if esta_superada(registros):
-            total = total + creditos_de(asignaturas, codigo)
-    return total
-
-
-def progreso(expediente, plan, asignaturas):
-    """Porcentaje de creditos superados sobre los del titulo."""
-    creditos_del_titulo = plan["creditos_titulo"]
-    if creditos_del_titulo == 0:
-        return 0.0
-    superados = creditos_superados(expediente, asignaturas)
-    return round((superados * 100.0) / creditos_del_titulo, DECIMALES)
+def plan_de(ruta_plan):
+    """El plan del fichero ruta_plan, por ejemplo datos/planes/PLAN-2024.json."""
+    ruta = Path(ruta_plan)
+    return cargar_plan(ruta.stem, ruta.parent)
 
 
 # --- convocatorias ---------------------------------------------------------------
@@ -151,27 +65,26 @@ def convocatorias(expediente):
 
 
 def puede_matricular(expediente, codigo):
-    """False si ya se han consumido MAX_CONV convocatorias de la asignatura."""
-    return convocatorias(expediente).get(codigo, 0) < MAX_CONV
+    """False si ya se han consumido las convocatorias maximas del plan del estudiante (D-07).
+
+    Es la misma regla que aplica la matricula en src/aula/reglas/motor.py (SPEC-001).
+    """
+    plan = cargar_plan(expediente["plan"])
+    return convocatorias(expediente).get(codigo, 0) < plan.max_convocatorias
 
 
 # --- puntos de entrada del proceso nocturno --------------------------------------
 
 def calcular(expediente, ruta_plan):
-    """Resultado de un estudiante. Lo guarda en _CACHE y, si se vuelve a pedir para el mismo
-    estudiante y plan, devuelve el guardado sin recalcular."""
-    clave = expediente["estudiante_id"] + "|" + ruta_plan
-    if clave in _CACHE:
-        return _CACHE[clave]
-    plan, asignaturas = cargar_plan(ruta_plan)
-    resultado = {
+    """Resultado de un estudiante con las reglas de SPEC-002, siempre con su expediente actual."""
+    plan = plan_de(ruta_plan)
+    datos = a_expediente(expediente)
+    return {
         "estudiante_id": expediente["estudiante_id"],
-        "nota_media": media(expediente, asignaturas),
-        "creditos_superados": creditos_superados(expediente, asignaturas),
-        "progreso_pct": progreso(expediente, plan, asignaturas),
+        "nota_media": reglas.nota_media_ponderada(datos, plan),
+        "creditos_superados": reglas.creditos_superados(datos, plan),
+        "progreso_pct": reglas.progreso(datos, plan),
     }
-    _CACHE[clave] = resultado
-    return resultado
 
 
 def calcular_lote(expedientes, ruta_plan):
